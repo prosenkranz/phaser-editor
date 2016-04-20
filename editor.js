@@ -87,12 +87,17 @@ function mouseHoversPoint(mousePos, point, helperSz) {
 		}, mousePos);
 }
 
-function mouseHoversDragpoint(mousePos, point, radius) {
+function mouseHoversDragpoint(mousePos, dragPoint, pointRadius, objCenter, objAngle) {
+	// Rotate point around object center
+	var point = new Phaser.Point(dragPoint.x, dragPoint.y);
+	point = point.rotate(objCenter.x, objCenter.y, objAngle, true);
+	
+	// Do hit-test
 	var pp = {
 		x: point.x - mousePos.x,
 		y: point.y - mousePos.y
 	};
-	return (pp.x * pp.x + pp.y * pp.y <= radius * radius);
+	return (pp.x * pp.x + pp.y * pp.y <= pointRadius * pointRadius);	
 }
 
 
@@ -117,7 +122,8 @@ window.onload = function() {
 	
 	var selectedObject = null;
 	var scalePointHovered = false;
-	var rotatePointHovered = false;	
+	var rotatePointHovered = false;
+	var rotating = false;	
 	
 	var mode;
 
@@ -128,7 +134,10 @@ window.onload = function() {
 	var transformPoint = null;	
 	var focusPoint = null; // for edit mode
 	var focusPoly = null; // poly of focusPoint
-	var transformObject = null;								
+	var transformObject = null;
+	
+	
+	var testv2 = { x: 0, y: 0 };							
 	
 	// -------------------------------------------------------------------------
 	// 		P r e l o a d
@@ -205,20 +214,14 @@ window.onload = function() {
 			scalePointHovered = false;            
 
 			var sprite = selectedObject.sprite;
-
 			var objPos = { x: sprite.body.x, y: sprite.body.y };
 			var objSz = { w: sprite.width, h: sprite.height };
-			
-			var rotPoint = [], scalePoint = [];			
-			sprite.body.toWorldFrame(rotPoint, [objPos.x, objPos.y - objSz.h * 0.5]);									
-						
-			if (mouseHoversDragpoint(mousePos, {x: rotPoint[0], y: rotPoint[1]}, DRAGPOINT_HELPER_RADIUS)) {
+			var objAngle = sprite.body.angle;									
+				
+			if (mouseHoversDragpoint(mousePos, {x: objPos.x, y: objPos.y - objSz.h * 0.5}, DRAGPOINT_HELPER_RADIUS, objPos, objAngle)) {			
 				rotatePointHovered = true;								
 			}
-			else if (mouseHoversDragpoint(mousePos, { x: objPos.x + objSz.w * 0.5, y: objPos.y + objSz.h * 0.5 }, DRAGPOINT_HELPER_RADIUS)) {
-				sprite.body.angle = 1.2;
-				console.debug(sprite.angle);
-				console.debug(rotPoint);
+			else if (mouseHoversDragpoint(mousePos, { x: objPos.x + objSz.w * 0.5, y: objPos.y + objSz.h * 0.5 }, DRAGPOINT_HELPER_RADIUS, objPos, objAngle)) {								
 				scalePointHovered = true;				
 			}
 		}
@@ -227,8 +230,8 @@ window.onload = function() {
 			if (mode == MODE_TRANSFORM) {
 				var diff = { x: mousePos.x - transformOldPos.x, y: mousePos.y - transformOldPos.y };
 
-				if (transformPoly != null) {
-					// Transform poly					
+                // Transform poly
+				if (transformPoly != null) {										
 					for (var i = 0; i < transformPoly.points.length; ++i) {
 						transformPoly.points[i].x += diff.x;
 						transformPoly.points[i].y += diff.y;				
@@ -240,13 +243,18 @@ window.onload = function() {
 					transformOldPos = mousePos;
 				}
 				
+				// Transform object
 				if (transformObject != null) {
 					var center = { x: transformObject.sprite.body.x, y: transformObject.sprite.body.y };
-					if (rotatePointHovered) {
+					if (rotating) {
 					    // Rotate object
-						var v1 = new Phaser.Point(transformOldPos.x - center.x, transformOldPos.y - center.y).normalize();
+						var v1 = new Phaser.Point(0, -1); // up
 					    var v2 = new Phaser.Point(mousePos.x - center.x, mousePos.y - center.y).normalize();
-						transformObject.sprite.body.angle += v1.angle(v2, false);												
+						var alpha = Math.acos(v1.dot(v2)) * 180.0 / Math.PI;
+						if (mousePos.x < center.x)
+							alpha = 360 - alpha;
+						
+						transformObject.sprite.body.angle = alpha;												
 					}
 					else if (scalePointHovered) {
 						// Scale object
@@ -366,10 +374,14 @@ window.onload = function() {
 			
 			// handle dragpoints
 			if (selectedObject != null) {
-				if (rotatePointHovered || scalePointHovered) {
+				if (rotating) {
+					found = true;
+				}
+				else if (rotatePointHovered || scalePointHovered) {
 					transformObject = selectedObject;
 					transformOldPos = pos;
-					found = true;									
+					found = true;
+					rotating = rotatePointHovered;									
 				}
 			}			
 
@@ -419,6 +431,7 @@ window.onload = function() {
 		transformPoly = null;
 		transformObject = null;
 		transformPoint = null;
+		rotating = false;
 	}
 	
 	// -------------------------------------------------------------------------
@@ -467,7 +480,9 @@ window.onload = function() {
 			
 			// draw scale drag box
 			ctx.fillStyle = (scalePointHovered ? "#afa" : "#0f0");
-			drawDragpoint(sprite.width * 0.5, sprite.height * 0.5);						 
+			drawDragpoint(sprite.width * 0.5, sprite.height * 0.5);			
+			 
+			game.debug.text("angle = " + body.angle, 10, 30);
 			
 			ctx.restore();
 		}
