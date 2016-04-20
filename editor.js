@@ -123,7 +123,8 @@ window.onload = function() {
 	var selectedObject = null;
 	var scalePointHovered = false;
 	var rotatePointHovered = false;
-	var rotating = false;	
+	var rotating = false;
+	var scaling = false;
 	
 	var mode;
 
@@ -246,19 +247,30 @@ window.onload = function() {
 				// Transform object
 				if (transformObject != null) {
 					var center = { x: transformObject.sprite.body.x, y: transformObject.sprite.body.y };
+					var c2m = new Phaser.Point(mousePos.x - center.x, mousePos.y - center.y); // center to mouse
 					if (rotating) {
 					    // Rotate object
-						var v1 = new Phaser.Point(0, -1); // up
-					    var v2 = new Phaser.Point(mousePos.x - center.x, mousePos.y - center.y).normalize();
-						var alpha = Math.acos(v1.dot(v2)) * 180.0 / Math.PI;
+						var up = new Phaser.Point(0, -1);
+						var alpha = Math.acos(up.dot(c2m.normalize())) * 180.0 / Math.PI;
 						if (mousePos.x < center.x)
 							alpha = 360 - alpha;
 						
 						transformObject.sprite.body.angle = alpha;												
 					}
-					else if (scalePointHovered) {
+					else if (scaling) {
 						// Scale object
+						var objSz = { w: transformObject.sprite.width, h: transformObject.sprite.height };
+						var c2mScreen = c2m.rotate(0, 0, -transformObject.sprite.body.angle, true);
+						var topLeft = new Phaser.Point(-objSz.w * 0.5, -objSz.h * 0.5);
+						var diag = c2mScreen.subtract(topLeft.x, topLeft.y);
+						transformObject.sprite.width = diag.x;
+						transformObject.sprite.height = diag.y;
+						transformObject.sprite.body.setRectangle(diag.x, diag.y);
 						
+						var newCenter = topLeft.add(diag.x * 0.5, diag.y * 0.5);
+						newCenter = newCenter.rotate(0, 0, transformObject.sprite.body.angle, true);
+						transformObject.sprite.body.x += newCenter.x;
+						transformObject.sprite.body.y += newCenter.y;
 					}
 					else {					
 						// Translate object
@@ -374,14 +386,15 @@ window.onload = function() {
 			
 			// handle dragpoints
 			if (selectedObject != null) {
-				if (rotating) {
+				if (rotating || scaling) {
 					found = true;
 				}
 				else if (rotatePointHovered || scalePointHovered) {
 					transformObject = selectedObject;
 					transformOldPos = pos;
 					found = true;
-					rotating = rotatePointHovered;									
+					rotating = rotatePointHovered;
+					scaling = scalePointHovered;
 				}
 			}			
 
@@ -432,6 +445,7 @@ window.onload = function() {
 		transformObject = null;
 		transformPoint = null;
 		rotating = false;
+		scaling = false;
 	}
 	
 	// -------------------------------------------------------------------------
