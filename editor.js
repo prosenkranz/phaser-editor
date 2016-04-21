@@ -556,13 +556,20 @@ window.onload = function() {
 	// -------------------------------------------------------------------------
 	// 		E x p o r t   /   I m p o r t
 	// -------------------------------------------------------------------------
+
+	// assets queued for loading to be used as sprites for imported objects
+	// This is not really a queue, but a list of asset keys, each having a list of objects to initialize w/ this asset
+	var importQueue = [];
+
 	window.dumpCode = function() {
 		var d = {
 			exportScreenWidth: game.width,
 			exportScreenHeight: game.height,
-			polygons: []
+			polygons: [],
+			objects: []
 		};
 		
+		// Serialize polygons:
 		polys.forEach(function(poly) {
 			var p = d.polygons[d.polygons.length] = {
 				name: poly.name,
@@ -574,12 +581,23 @@ window.onload = function() {
 			} 
 		});
 		
+		// Serialize objects:
+		objects.forEach(function(obj) {
+			d.objects[d.objects.length] = {
+				name: obj.name,
+				position: { x: Math.round(obj.sprite.body.x), y: Math.round(obj.sprite.body.y) },
+				size: { w: Math.round(obj.sprite.width), h: Math.round(obj.sprite.height) },
+				angle: obj.sprite.body.angle,
+				asset: obj.sprite.key
+			};
+		});
+
 		var out = document.getElementById('output');	
-		out.innerHTML = JSON.stringify(d);		
+		out.value = JSON.stringify(d);
 	}
-	
+
 	window.importCode = function() {
-		var code = document.getElementById('output').value;		
+		var code = document.getElementById('output').value;
 		var d = JSON.parse(code);
 		
 		// TODO: Make sure the code is correct and contains all necessary elements
@@ -589,6 +607,7 @@ window.onload = function() {
 			y: game.height / d.exportScreenHeight
 		};
 		
+		// Import polys:
 		polys = [];
 		curPoly.points = [];
 		transformPoly = null;		
@@ -610,8 +629,110 @@ window.onload = function() {
 			p.aabb = calculateAABB(p.points);
 		});
 
+		// Import objects:
+		objects.forEach(function(obj) { obj.destroy(); });
+		objects = [];
+		transformObject = null;
+		var imagesQueued = false;
+		d.objects.forEach(function(obj) {
+			var o = objects[objects.length] = {
+				name: obj.name
+			};
+
+			obj.position.x *= scale.x;
+			obj.position.y *= scale.y;
+			obj.size.w *= scale.x;
+			obj.size.h *= scale.y;
+
+			if (game.cache.checkImageKey(obj.asset)) {
+				addLoadedObjectSprite(o, obj);
+			}
+			else {
+				// Find asset url in our asset list
+				var found = false;
+				for (var i = 0; i < loadedAssets.length; ++i) {
+					if (loadedAssets[i].name == obj.asset) {
+						game.load.image(loadedAssets[i].name, assetsDir + loadedAssets[i].file);
+						addImportQueuedAsset(loadedAssets[i].name, o, obj);
+						found = true;
+						break;
+					}
+				}
+
+				if (!found) {
+					// Asset not known - create sprite anyway (TODO: Helper material)
+					addLoadedObjectSprite(o, obj);
+				}
+			}
+		});
+
+		if (importQueue.length > 0) {
+			game.load.onFileComplete.add(onImportQueueFileComplete, this);
+			game.load.start();
+		}
+
+
 		onModeChange(MODE_TRANSFORM);
 		selectPoly(null);
+		selectObject(null);
+	}
+
+	function addLoadedObjectSprite(o, info) {
+		o.sprite = game.add.sprite(info.position.x, info.position.y, info.asset);
+		o.sprite.width = info.size.w;
+		o.sprite.height = info.size.h;
+
+		game.physics.p2.enable(o.sprite);
+		o.sprite.body.kinematic = false;
+		o.sprite.body.motionState = Phaser.Physics.P2.Body.STATIC;
+
+		o.sprite.body.angle = info.angle;
+	}
+
+	function addImportQueuedAsset(key, o, loadedObjInfo) {
+		var found = false;
+		for (var i = 0; i < importQueue.length; ++i) {
+
+			// TODO: Check if phaser handles keys as case sensitive or not
+			if (importQueue[i].key == key) {
+				// add object to existing key
+				importQueue[i].objects[importQueue.length] = {
+					object: o,
+					info: JSON.parse(JSON.stringify(loadedObjInfo))
+				};
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			// Create a new key entry in importQueue
+			importQueue[importQueue.length] = {
+				key: key,
+				objects: [
+					{
+						object: o,
+						info: JSON.parse(JSON.stringify(loadedObjInfo))
+					}
+				]
+			};
+		}
+	}
+
+	function onImportQueueFileComplete(progress, key) {
+		for (var i = 0; i < importQueue.length; ++i) {
+			if (importQueue[i].key == key) {
+				importQueue[i].objects.forEach(function(object) {
+					addLoadedObjectSprite(object.object, object.info);
+				});
+				importQueue.splice(i, 1);
+				break;
+			}
+		}
+
+		if (importQueue.length == 0) {
+			game.load.onFileComplete.remove(onImportQueueFileComplete, this);
+		}
 	}
     
     
@@ -648,6 +769,7 @@ window.onload = function() {
 	
 	var assetsDir = "assets/";
 	var assetsDiv = $('assets');
+	var loadedAssets = []; // list of known key<->url mapping of assets
 	
 	// Load assets.json	
 	window.loadAssets = function() {
@@ -656,6 +778,7 @@ window.onload = function() {
 			if (req.readyState == 4 && req.status == 200) {
 				var d = JSON.parse(req.responseText);
 				var s = "";
+				loadedAssets = d;
 				d.forEach(function(asset) {
 					s += "<div><button class='assets-add' onclick='insertAsset(\"" + asset.name + "\",\"" + asset.file + "\")'>Add</button>" + asset.name + "</div>";
 				});
