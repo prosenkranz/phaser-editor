@@ -808,7 +808,6 @@ window.onload = function() {
 		req.open("GET", assetsDir + "assets.json", true);
 		req.send();			
 	}	
-	loadAssets();
 	
 	window.insertAsset = function(name, file) {		
 		// Load resource if necessary			
@@ -871,7 +870,6 @@ window.onload = function() {
 		req.open("GET", assetsDir + "backgrounds.json", true);
 		req.send();	
 	}
-	loadBackgrounds();
 	
 	window.setBackground = function(name, file) {
 		if (!game.cache.checkImageKey(name)) {
@@ -892,4 +890,38 @@ window.onload = function() {
 		bg.width = game.width;
 		bg.height = game.height;
 	}	
+
+
+
+
+
+
+
+	// LOAD SYSTEM CONFIG
+
+	function loadConfig() {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4) {
+				if (req.state == 200) {
+					var d = JSON.parse(req.responseText);
+					assetsDir = d.assetsDir;
+				}
+				else {
+					console.log("There is no custom config.json! Using defaults...");
+				}
+
+				onConfigLoaded();
+			}
+		}
+		req.open("GET", "config.json", true);
+		req.onerror = function() {}
+		req.send();
+	}
+	loadConfig();
+
+	function onConfigLoaded() {
+		loadAssets();
+		loadBackgrounds();
+	}
 };
