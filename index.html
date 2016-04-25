@@ -47,7 +47,7 @@
 		button:hover {
 			background-color: #999;						
 		}
-		button.assets-add {
+		button.add-resource {
 			padding: 0px 5px;
 			margin-right: 5px;
 			font-size: 11px;			
@@ -69,15 +69,15 @@
 		#poly-name-controls {
 			display: none;
 		}
-		#assets {
+		.resourcelist {
 			width: 300px;
 			background-color: #3e3e3e;
 			border: 1px solid #555;
 		}		
-		#assets > div {
+		.resourcelist > div {
 			padding: 0px 2px;
 		}
-		#assets > div:nth-child(odd) {
+		.resourcelist > div:nth-child(odd) {
 			background-color: #444; 
 		}
 		#editlayer-select {
@@ -122,7 +122,12 @@
 			</fieldset>
 		</div>
 		<div><strong>Assets:</strong></div>
-		<div id="assets"></div>
+		<div id="assets" class="resourcelist"></div>
+		
+		<br />
+		
+		<div><strong>Backgrounds:</strong></div>
+		<div id="backgrounds" class="resourcelist"></div>
 	</div>		
 </body>
 </html>

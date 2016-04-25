@@ -114,6 +114,8 @@ window.onload = function() {
 	
 	var game = new Phaser.Game(WIDTH, HEIGHT, Phaser.CANVAS, 'editor', { preload: preload, create: create, update: update, render: render }); 	
 	
+	var bg; // background image
+	
 	var polys;
 	var selectedPoly = null;
 	var curPoly = {
@@ -144,7 +146,7 @@ window.onload = function() {
 	// 		P r e l o a d
 	// -------------------------------------------------------------------------
 	function preload() {		
-		game.load.image('scene1-background.bmp', 'scene1-background.bmp');		
+		game.load.image('no-scene-background', 'no-scene-background.jpg');		
 	}
 
 	// -------------------------------------------------------------------------
@@ -154,9 +156,8 @@ window.onload = function() {
 		game.clearBeforeRender = false;
 		game.physics.startSystem(Phaser.Physics.P2JS);
 
-		var bg = game.add.image(0, 0, 'scene1-background.bmp');
-		bg.width = game.width;
-		bg.height = game.height;										
+		bg = game.add.image(0, 0);
+		setSceneBackground('no-scene-background');										
 
 		game.input.onDown.add(onMouseDown, this);
 		game.input.onUp.add(onMouseUp, this);		
@@ -565,6 +566,7 @@ window.onload = function() {
 		var d = {
 			exportScreenWidth: game.width,
 			exportScreenHeight: game.height,
+			sceneBackground: bg.key,
 			polygons: [],
 			objects: []
 		};
@@ -601,6 +603,24 @@ window.onload = function() {
 		var d = JSON.parse(code);
 		
 		// TODO: Make sure the code is correct and contains all necessary elements
+		
+		var bgName = d.sceneBackground;
+		if (!game.cache.checkImageKey(bgName)) {
+			for (var i = 0; i < loadedBackgrounds.length; ++i) {
+				var loadedBackground = loadedBackgrounds[i];
+				if (loadedBackground.name == bgName) {
+					game.load.image(loadedBackground.name, assetsDir + loadedBackground.file);
+					game.load.onFileComplete.addOnce(function(p, key) {
+						setSceneBackground(key);
+					}, $this, 0);
+					game.load.start();
+					break;
+				}				
+			}
+		}
+		else {
+			setSceneBackground(bgName);
+		}		
 		
 		var scale = {
 			x: game.width / d.exportScreenWidth,
@@ -768,7 +788,7 @@ window.onload = function() {
 	var objects = [];
 	
 	var assetsDir = "assets/";
-	var assetsDiv = $('assets');
+	var assetsDiv = $('assets');	
 	var loadedAssets = []; // list of known key<->url mapping of assets
 	
 	// Load assets.json	
@@ -780,7 +800,7 @@ window.onload = function() {
 				var s = "";
 				loadedAssets = d;
 				d.forEach(function(asset) {
-					s += "<div><button class='assets-add' onclick='insertAsset(\"" + asset.name + "\",\"" + asset.file + "\")'>Add</button>" + asset.name + "</div>";
+					s += "<div><button class='add-resource' onclick='insertAsset(\"" + asset.name + "\",\"" + asset.file + "\")'>Add</button>" + asset.name + "</div>";
 				});
 				assetsDiv.innerHTML = s;
 			}			
@@ -794,11 +814,11 @@ window.onload = function() {
 		// Load resource if necessary			
 		if (!game.cache.checkImageKey(name)) {			
 			var url = assetsDir + file;
-			game.load.image(name, url);
-			game.load.start();
+			game.load.image(name, url);			
 			game.load.onFileComplete.addOnce(function(p, key) {
 					addDynamicObject(key, key);
-				}, $this, 0);		
+				}, $this, 0);
+			game.load.start();		
 		}
 		else {			
 			addDynamicObject(name, name);
@@ -825,5 +845,51 @@ window.onload = function() {
 	// pass null to unselect all
 	function selectObject(obj) {					
 		selectedObject = obj;
+	}	
+	
+	
+	
+	
+	// BACKGROUNDS:
+	
+	var backgroundsDiv = $('backgrounds');
+	var loadedBackgrounds = [];
+	
+	window.loadBackgrounds = function() {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4 && req.status == 200) {
+				var d = JSON.parse(req.responseText);
+				var s = "";
+				loadedBackgrounds = d;
+				d.forEach(function(bg) {
+					s += "<div><button class='add-resource' onclick='setBackground(\"" + bg.name + "\",\"" + bg.file + "\")'>Use</button>" + bg.name + "</div>";
+				});
+				backgroundsDiv.innerHTML = s;
+			}			
+		}
+		req.open("GET", assetsDir + "backgrounds.json", true);
+		req.send();	
+	}
+	loadBackgrounds();
+	
+	window.setBackground = function(name, file) {
+		if (!game.cache.checkImageKey(name)) {
+			game.load.image(name, assetsDir + file);			
+			game.load.onFileComplete.addOnce(function(progress, key) {
+					setSceneBackground(key);
+				}, $this, 0);
+			game.load.start();
+		}
+		else {
+			setSceneBackground(name);
+		}	
+	}
+	
+	// name - the resource name of the scene background image, has to be loaded
+	function setSceneBackground(name) {		
+		bg.loadTexture(name);
+		bg.width = game.width;
+		bg.height = game.height;
 	}	
 };
