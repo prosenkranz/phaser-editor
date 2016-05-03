@@ -1,8 +1,8 @@
 <html>
 <head>
-    <script type="application/javascript" src="phaser.min.js"></script>
-    <style type="text/css">
-    	body {
+<script type="application/javascript" src="phaser.min.js"></script>
+<style type="text/css">
+	body {
 			background-color: #333;
 			color: #aaa;
 			font-family: Monospace, Courier-New, Arial;
@@ -10,66 +10,66 @@
 		#center,
 		#right {
 			display: inline-block;
-			vertical-align: top;			
+			vertical-align: top;
 		}
 		#center {
 			width: 1100px;
 		}
-		#right {			
+		#right {
 		}
-		#wrapper {			
+		#wrapper {
 			display: inline-block;
 		}
 		#output {
 			display: inline-block;
-            width: 800px;
+			width: 800px;
 			height: 200px;
 			background-color: #444;
-			border: 1px solid #666;			
+			border: 1px solid #666;
 			color: #aaa;
 		}
-        #properties-wrapper {
-            display: inline-block;
-            vertical-align: top;
-        }
+		#properties-wrapper {
+			display: inline-block;
+			vertical-align: top;
+		}
 		#tools {
 			padding: 5px 0px;
 			text-align: left;
 			position: relative;
 		}
 		#mode {
-		    position: absolute;
-		    right: 2px;
-		    top: 2px;
-			font-size: 22px;		    
+			position: absolute;
+			right: 2px;
+			top: 2px;
+			font-size: 22px;
 		}	
 		button, input {
 			background-color: #888;
 			border: 1px solid #aaa;
 			cursor: pointer;
-			padding: 1px 14px;									
+			padding: 1px 14px;
 		}
 		button:hover {
-			background-color: #999;						
+			background-color: #999;
 		}
 		button.add-resource {
 			padding: 0px 5px;
 			margin-right: 5px;
-			font-size: 11px;			
+			font-size: 11px;
 		}
 		label {
 			font-size: 11px;
 			line-height: 11px;
 		}
 		input {
-		    font-size: 11px;		    
+			font-size: 11px;
 		}
 		input[type=text] {
 			background-color: #b4b4b4;
 			padding: 2px 5px;
 		}
 		input[type=text]:hover {
-		    background-color: #d0d0d0;
+			background-color: #d0d0d0;
 		}
 		#poly-name-controls {
 			display: none;
@@ -96,31 +96,31 @@
 			margin-left: 0px;
 			line-height: 20px;
 			font-size: 13px;
-		}									
+		}
 	</style>
 </head>
 <body>
-    <script type="application/javascript" src="editor.js"></script>
-	<div id="center">    
+	<script type="application/javascript" src="editor.js"></script>
+	<div id="center">
 		<div id="wrapper">
-			<div id="editor"></div>			
+			<div id="editor"></div>
 			<div id="tools">
 				<button onclick="editor.dumpCode(); return false;">Export</button>
 				<button onclick="editor.importCode(); return false;">Import</button>
-				
-				
-				<div id="poly-name-controls">				
+
+
+				<div id="poly-name-controls">
 					<label for="poly-name">Polygon name: </label>
 					<input type="text" id="poly-name" name="poly-name" placeholder="Name" />
 				</div>
-				
+
 				<div id="mode"></div>
 			</div>
 		</div>
 		<div id="below">
 			<textarea id="output"></textarea>
 			<div id="properties-wrapper">
-                Properties:<br />
+				Properties:<br />
 				<div id="properties">
 					<label for="prop-name">Name: </label><input type="text" id="prop-name" name="prop-name" placeholder="Object" />
 				</div>
@@ -130,11 +130,11 @@
 	<div id="right">
 		<div><strong>Assets:</strong></div>
 		<div id="assets" class="resourcelist"></div>
-		
+
 		<br />
-		
+
 		<div><strong>Backgrounds:</strong></div>
 		<div id="backgrounds" class="resourcelist"></div>
-	</div>		
+	</div>
 </body>
 </html>
