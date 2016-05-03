@@ -21,12 +21,17 @@
 			display: inline-block;
 		}
 		#output {
-			width: 1100px;
+			display: inline-block;
+            width: 800px;
 			height: 200px;
 			background-color: #444;
 			border: 1px solid #666;			
 			color: #aaa;
 		}
+        #properties-wrapper {
+            display: inline-block;
+            vertical-align: top;
+        }
 		#tools {
 			padding: 5px 0px;
 			text-align: left;
@@ -100,8 +105,8 @@
 		<div id="wrapper">
 			<div id="editor"></div>			
 			<div id="tools">
-				<button onclick="dumpCode(); return false;">Export</button>
-				<button onclick="importCode(); return false;">Import</button>
+				<button onclick="editor.dumpCode(); return false;">Export</button>
+				<button onclick="editor.importCode(); return false;">Import</button>
 				
 				
 				<div id="poly-name-controls">				
@@ -111,8 +116,16 @@
 				
 				<div id="mode"></div>
 			</div>
-		</div>		
-		<textarea id="output"></textarea>
+		</div>
+		<div id="below">
+			<textarea id="output"></textarea>
+			<div id="properties-wrapper">
+                Properties:<br />
+				<div id="properties">
+					<label for="prop-name">Name: </label><input type="text" id="prop-name" name="prop-name" placeholder="Object" />
+				</div>
+			</div>
+		</div>
 	</div>
 	<div id="right">
 		<div><strong>Assets:</strong></div>

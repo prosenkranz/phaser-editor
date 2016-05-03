@@ -105,18 +105,24 @@ function mouseHoversDragpoint(mousePos, dragPoint, pointRadius, objCenter, objAn
 
 
 
-window.onload = function() {	
+CEditor = function() {
 	
 	var WIDTH = 1100;
 	var HEIGHT = WIDTH * 9 / 16;
 	
 	var $this = this;
 	
-	var game = new Phaser.Game(WIDTH, HEIGHT, Phaser.CANVAS, 'editor', { preload: preload, create: create, update: update, render: render }); 	
+	var game = new Phaser.Game(WIDTH, HEIGHT, Phaser.CANVAS, 'editor', { preload: preload, create: create, update: update, render: render });
 	
-	var bg; // background image
+	var propFields = new CPropertyFields();
 	
-	var polys;
+	this.config = new CEditorConfig();
+	this.config.onConfigLoaded = function() {
+		editor.assets.loadAssetsList();
+		loadBackgrounds();
+	}
+
+	var scene = new CScene(game);
 	var selectedPoly = null;
 	var curPoly = {
 		points: []
@@ -138,9 +144,12 @@ window.onload = function() {
 	var focusPoint = null; // for edit mode
 	var focusPoly = null; // poly of focusPoint
 	var transformObject = null;
+
+	this.getCanvasSize = function() {
+		return { w: game.width, h: game.height };
+	}
 	
-	
-	var testv2 = { x: 0, y: 0 };							
+
 	
 	// -------------------------------------------------------------------------
 	// 		P r e l o a d
@@ -156,20 +165,20 @@ window.onload = function() {
 		game.clearBeforeRender = false;
 		game.physics.startSystem(Phaser.Physics.P2JS);
 
-		bg = game.add.image(0, 0);
-		setSceneBackground('no-scene-background');										
+		scene.init();
+		scene.setBackground('no-scene-background');
 
-		game.input.onDown.add(onMouseDown, this);
-		game.input.onUp.add(onMouseUp, this);		
+		game.input.onDown.add(onMouseDown, $this);
+		game.input.onUp.add(onMouseUp, $this);
 		
 		polys = new Array();
-		onModeChange(MODE_CREATE);
+		$this.setMode(MODE_CREATE);
 		
-		game.input.keyboard.addKey(Phaser.Keyboard.ONE).onDown.add(function() { if (document.activeElement != document.body) return; onModeChange(MODE_TRANSFORM); }, this);
-		game.input.keyboard.addKey(Phaser.Keyboard.TWO).onDown.add(function() { if (document.activeElement != document.body) return; onModeChange(MODE_CREATE); }, this);
-		game.input.keyboard.addKey(Phaser.Keyboard.THREE).onDown.add(function() { if (document.activeElement != document.body) return; onModeChange(MODE_EDIT); }, this);
-		game.input.keyboard.addKey(Phaser.Keyboard.DELETE).onDown.add(function() { if (document.activeElement != document.body) return; deleteSelectedPoly(); }, this);
-		game.input.keyboard.addKey(Phaser.Keyboard.ESC).onDown.add(function() { if (document.activeElement != document.body) return; cancelCreatePoly(); }, this);
+		game.input.keyboard.addKey(Phaser.Keyboard.ONE).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_TRANSFORM); }, $this);
+		game.input.keyboard.addKey(Phaser.Keyboard.TWO).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_CREATE); }, $this);
+		game.input.keyboard.addKey(Phaser.Keyboard.THREE).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_EDIT); }, $this);
+		game.input.keyboard.addKey(Phaser.Keyboard.DELETE).onDown.add(function() { if (document.activeElement != document.body) return; deleteSelectedPoly(); }, $this);
+		game.input.keyboard.addKey(Phaser.Keyboard.ESC).onDown.add(function() { if (document.activeElement != document.body) return; cancelCreatePoly(); }, $this);
 		
 		game.input.keyboard.removeKeyCapture(Phaser.Keyboard.ONE);
     	game.input.keyboard.removeKeyCapture(Phaser.Keyboard.TWO);
@@ -192,14 +201,16 @@ window.onload = function() {
 				focusPoint = null;
 				focusPoly = null;
 				// Find new hovered (focus-) point
-				for (var i = 0; i < polys.length; ++i) {
-					if (aabbContainsPoint(offsetAABB(polys[i].aabb, POINT_HELPER_SIZE * 0.5), mousePos)) {
+				// This is done by doing a broadphase-test first, then check all points of a minimized set of polys.
+				for (var i = 0; i < scene.polys.length; ++i) {
+					var poly = scene.polys[i];
+					if (aabbContainsPoint(offsetAABB(poly.aabb, POINT_HELPER_SIZE * 0.5), mousePos)) {
 					    var found = false;
-						for (var j = 0; j < polys[i].points.length; ++j) {
-							if (mouseHoversPoint(mousePos, polys[i].points[j], POINT_HELPER_SIZE)) {
+						for (var j = 0; j < poly.points.length; ++j) {
+							if (mouseHoversPoint(mousePos, poly.points[j], POINT_HELPER_SIZE)) {
 								found = true;
-								focusPoint = polys[i].points[j];
-								focusPoly = polys[i];
+								focusPoint = poly.points[j];
+								focusPoly = poly;
 								break;
 							}
 						}
@@ -291,63 +302,14 @@ window.onload = function() {
 				transformOldPos = mousePos;
 			}					
 		}		
-	}
-	
-	function onModeChange(newMode) {
-		cancelCreatePoly();
-		mode = newMode;
-		
-		if (mode != MODE_TRANSFORM) {
-			selectPoly(null);
-			cancelCreatePoly();
-		}
-		
-		if (mode != MODE_EDIT) {
-		    focusPoint = null;
-		    transformPoint = null;
-		}		
-
-		var modeTxt = document.getElementById('mode');
-		modeTxt.innerHTML = getModeName(mode);
-		modeTxt.style.color = getModeColor(mode);		
 	}	
 	
-	function addPoint(x, y) {
-		curPoly.points[curPoly.points.length] = { x: x, y: y };
-	}
-	
-	// pass null to unselect all
-	function selectPoly(poly) {
-		selectedPoly = null;
-		polys.forEach(function(p) {			
-			if (p == poly) {
-				p.selected = true;
-				selectedPoly = poly;
-			}
-			else {
-				p.selected = false;
-			}			
-		});
-		
-		showPolyNameControls(selectedPoly != null);					
-	}
-	
-	function deleteSelectedPoly() {
-		for (var i = 0; i < polys.length; ++i) {
-			if (polys[i].selected) {
-				polys.splice(i, 1);
-				break;
-			}			
-		}
-		
-		showPolyNameControls(false);
-	}
-	
-	function cancelCreatePoly() {
-		curPoly.points = [];
-	}
-	
-	function onMouseDown() {		
+
+	// -------------------------------------------------------------------------
+	// 		O n   M o u s e   D o w n
+	// -------------------------------------------------------------------------
+	function onMouseDown() {
+		var objects = scene.objects;
 		var pos = {
 			x: game.input.mousePointer.x,
 			y: game.input.mousePointer.y
@@ -362,18 +324,13 @@ window.onload = function() {
 				if (Phaser.Rectangle.containsPoint(boundRect, new Phaser.Point(pos.x, pos.y))) {
 					// Add poly
 					var points = curPoly.points.slice(0); // clone 
-					polys[polys.length] = {
-						points: points,
-						aabb: calculateAABB(points),
-						selected: false,
-						name: 'polygon'
-					};
+					scene.addPoly('polygon', points);
 					curPoly.points = [];
 					
 					// Immediately select it
-					selectPoly(polys[polys.length - 1]);
+					selectPoly(scene.polys[scene.polys.length - 1]);
 					
-					onModeChange(MODE_TRANSFORM);
+					this.setMode(MODE_TRANSFORM);
 					
 					return;
 				}
@@ -399,12 +356,12 @@ window.onload = function() {
 				}
 			}			
 
-			// handle object selection
+			// Handle object selection
 			if (!found) {			
 				for (var i = 0; i < objects.length; ++i) {
 					var intersected = game.physics.p2.hitTest(pos, [ objects[i].sprite ]);
 					if (intersected.length !== 0) {					
-						selectObject(objects[i]);									
+						this.selectObject(objects[i]);
 						transformObject = selectedObject;
 						transformOldPos = pos;
 						found = true;
@@ -414,21 +371,15 @@ window.onload = function() {
 			}
 			
 			if (!found)
-				selectObject(null);			
+				this.selectObject(null);
 			
-			// handle poly selection
-			selectPoly(null);
-			if (!found && polys.length > 0) {												
-				for (var i = 0; i < polys.length; ++i) {
-					if (polyContainsPoint(polys[i], pos)) {					
-						selectPoly(polys[i]);
-						
-						// start transformation
-						transformOldPos = pos;
-						transformPoly = polys[i];						
-						
-						break;
-					}
+			// Handle poly selection
+			if (!found) {
+				var hitPoly = scene.getHitPoly(pos);
+				selectPoly(hitPoly);
+				if (hitPoly != null) {
+					transformOldPos = pos;
+					transformPoly = hitPoly;
 				}
 			}			
 		}
@@ -440,6 +391,9 @@ window.onload = function() {
 		}
 	}
 	
+	// -------------------------------------------------------------------------
+	// 		O n   M o u s e    U p
+	// -------------------------------------------------------------------------
 	function onMouseUp() {
 		// Stop transforming
 		transformPoly = null;
@@ -456,8 +410,8 @@ window.onload = function() {
 		game.context.globalAlpha = 1.0;
 	
 		// Render polys
-		if (polys.length > 0) {			 			 
-			polys.forEach(function(poly) {
+		if (scene.polys.length > 0) {
+			scene.polys.forEach(function(poly) {
 				var polyStyle;
 				if (poly.selected)
 			 		polyStyle = { outlineColor: '#dd2', helperColor: '#dd4', closeOutline: true };
@@ -547,313 +501,143 @@ window.onload = function() {
 				pointHelperSz, pointHelperSz);
 		});		
 	}
-	
-	
-	
-	
-	
-	
 
-	// -------------------------------------------------------------------------
-	// 		E x p o r t   /   I m p o r t
-	// -------------------------------------------------------------------------
 
-	// assets queued for loading to be used as sprites for imported objects
-	// This is not really a queue, but a list of asset keys, each having a list of objects to initialize w/ this asset
-	var importQueue = [];
 
-	window.dumpCode = function() {
-		var d = {
-			exportScreenWidth: game.width,
-			exportScreenHeight: game.height,
-			sceneBackground: bg.key,
-			polygons: [],
-			objects: []
-		};
-		
-		// Serialize polygons:
-		polys.forEach(function(poly) {
-			var p = d.polygons[d.polygons.length] = {
-				name: poly.name,
-				points: []
-			};
-			for (var i = 0; i < poly.points.length; ++i) {
-				p.points[p.points.length] = poly.points[i].x;
-				p.points[p.points.length] = poly.points[i].y;				
-			} 
-		});
-		
-		// Serialize objects:
-		objects.forEach(function(obj) {
-			d.objects[d.objects.length] = {
-				name: obj.name,
-				position: { x: Math.round(obj.sprite.body.x), y: Math.round(obj.sprite.body.y) },
-				size: { w: Math.round(obj.sprite.width), h: Math.round(obj.sprite.height) },
-				angle: obj.sprite.body.angle,
-				asset: obj.sprite.key
-			};
-		});
 
-		var out = document.getElementById('output');	
-		out.value = JSON.stringify(d);
+
+
+
+
+
+
+
+    // -----------------------------------------------------------------------------------------------
+    // EDIT MODE
+
+    this.setMode = function(newMode) {
+		cancelCreatePoly();
+		mode = newMode;
+
+		if (mode != MODE_TRANSFORM) {
+			selectPoly(null);
+			cancelCreatePoly();
+		}
+
+		if (mode != MODE_EDIT) {
+		    focusPoint = null;
+		    transformPoint = null;
+		}
+
+		var modeTxt = document.getElementById('mode');
+		modeTxt.innerHTML = getModeName(mode);
+		modeTxt.style.color = getModeColor(mode);
 	}
 
-	window.importCode = function() {
-		var code = document.getElementById('output').value;
-		var d = JSON.parse(code);
-		
-		// TODO: Make sure the code is correct and contains all necessary elements
-		
-		var bgName = d.sceneBackground;
-		if (!game.cache.checkImageKey(bgName)) {
-			for (var i = 0; i < loadedBackgrounds.length; ++i) {
-				var loadedBackground = loadedBackgrounds[i];
-				if (loadedBackground.name == bgName) {
-					game.load.image(loadedBackground.name, assetsDir + loadedBackground.file);
-					game.load.onFileComplete.addOnce(function(p, key) {
-						setSceneBackground(key);
-					}, $this, 0);
-					game.load.start();
-					break;
-				}				
-			}
-		}
-		else {
-			setSceneBackground(bgName);
-		}		
-		
-		var scale = {
-			x: game.width / d.exportScreenWidth,
-			y: game.height / d.exportScreenHeight
-		};
-		
-		// Import polys:
-		polys = [];
-		curPoly.points = [];
-		transformPoly = null;		
-		d.polygons.forEach(function(poly) {
-			var p = polys[polys.length] = {
-				name: poly.name,
-				selected: false,
-				points: [],
-				aabb: {}
-			};
-			
-			for (var i = 0; i < poly.points.length; i += 2) {								
-				p.points[p.points.length] = {
-					x: poly.points[i] * scale.x,
-					y: poly.points[i + 1] * scale.y
-				}
-			}
-			
-			p.aabb = calculateAABB(p.points);
-		});
-
-		// Import objects:
-		objects.forEach(function(obj) { obj.destroy(); });
-		objects = [];
-		transformObject = null;
-		var imagesQueued = false;
-		d.objects.forEach(function(obj) {
-			var o = objects[objects.length] = {
-				name: obj.name
-			};
-
-			obj.position.x *= scale.x;
-			obj.position.y *= scale.y;
-			obj.size.w *= scale.x;
-			obj.size.h *= scale.y;
-
-			if (game.cache.checkImageKey(obj.asset)) {
-				addLoadedObjectSprite(o, obj);
-			}
-			else {
-				// Find asset url in our asset list
-				var found = false;
-				for (var i = 0; i < loadedAssets.length; ++i) {
-					if (loadedAssets[i].name == obj.asset) {
-						game.load.image(loadedAssets[i].name, assetsDir + loadedAssets[i].file);
-						addImportQueuedAsset(loadedAssets[i].name, o, obj);
-						found = true;
-						break;
-					}
-				}
-
-				if (!found) {
-					// Asset not known - create sprite anyway (TODO: Helper material)
-					addLoadedObjectSprite(o, obj);
-				}
-			}
-		});
-
-		if (importQueue.length > 0) {
-			game.load.onFileComplete.add(onImportQueueFileComplete, this);
-			game.load.start();
-		}
 
 
-		onModeChange(MODE_TRANSFORM);
-		selectPoly(null);
-		selectObject(null);
-	}
 
-	function addLoadedObjectSprite(o, info) {
-		o.sprite = game.add.sprite(info.position.x, info.position.y, info.asset);
-		o.sprite.width = info.size.w;
-		o.sprite.height = info.size.h;
+	// -----------------------------------------------------------------------------------------------
+	// POLYGONS
 
-		game.physics.p2.enable(o.sprite);
-		o.sprite.body.kinematic = false;
-		o.sprite.body.motionState = Phaser.Physics.P2.Body.STATIC;
-
-		o.sprite.body.angle = info.angle;
-	}
-
-	function addImportQueuedAsset(key, o, loadedObjInfo) {
-		var found = false;
-		for (var i = 0; i < importQueue.length; ++i) {
-
-			// TODO: Check if phaser handles keys as case sensitive or not
-			if (importQueue[i].key == key) {
-				// add object to existing key
-				importQueue[i].objects[importQueue.length] = {
-					object: o,
-					info: JSON.parse(JSON.stringify(loadedObjInfo))
-				};
-				found = true;
-				break;
-			}
-		}
-
-		if (!found) {
-			// Create a new key entry in importQueue
-			importQueue[importQueue.length] = {
-				key: key,
-				objects: [
-					{
-						object: o,
-						info: JSON.parse(JSON.stringify(loadedObjInfo))
-					}
-				]
-			};
-		}
-	}
-
-	function onImportQueueFileComplete(progress, key) {
-		for (var i = 0; i < importQueue.length; ++i) {
-			if (importQueue[i].key == key) {
-				importQueue[i].objects.forEach(function(object) {
-					addLoadedObjectSprite(object.object, object.info);
-				});
-				importQueue.splice(i, 1);
-				break;
-			}
-		}
-
-		if (importQueue.length == 0) {
-			game.load.onFileComplete.remove(onImportQueueFileComplete, this);
-		}
-	}
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    // GUI Stuff:
-    
-    var polyNameControls = $('poly-name-controls');
-    var polyName = $('poly-name');
-    
-    polyName.onkeyup = function() {		
-		if (selectedPoly != null) {
-			selectedPoly.name = polyName.value;
-		}
-	}
-	
-	// show - true/false
-	function showPolyNameControls(show) {
-		polyNameControls.style.display = (show ? 'inline-block' : 'none');
-		if (show)
-			polyName.value = selectedPoly.name;
-	}
-	
-	
-	
-	// ASSETS  &  DYNAMIC OBJECTS
-	
-	var objects = [];
-	
-	var assetsDir = "assets/";
-	var assetsDiv = $('assets');	
-	var loadedAssets = []; // list of known key<->url mapping of assets
-	
-	// Load assets.json	
-	window.loadAssets = function() {
-		var req = new XMLHttpRequest();
-		req.onreadystatechange = function() {
-			if (req.readyState == 4 && req.status == 200) {
-				var d = JSON.parse(req.responseText);
-				var s = "";
-				loadedAssets = d;
-				d.forEach(function(asset) {
-					s += "<div><button class='add-resource' onclick='insertAsset(\"" + asset.name + "\",\"" + asset.file + "\")'>Add</button>" + asset.name + "</div>";
-				});
-				assetsDiv.innerHTML = s;
-			}			
-		}
-		req.open("GET", assetsDir + "assets.json", true);
-		req.send();			
-	}	
-	
-	window.insertAsset = function(name, file) {		
-		// Load resource if necessary			
-		if (!game.cache.checkImageKey(name)) {			
-			var url = assetsDir + file;
-			game.load.image(name, url);			
-			game.load.onFileComplete.addOnce(function(p, key) {
-					addDynamicObject(key, key);
-				}, $this, 0);
-			game.load.start();		
-		}
-		else {			
-			addDynamicObject(name, name);
-		}								
-	}
-	
-	
-	// Inserts new object into the world
-	function addDynamicObject(asset, name) {		
-		var o = objects[objects.length] = {
-			name: name,
-			sprite: game.add.sprite(game.width * 0.5, game.height * 0.5, asset)
-		};
-		
-		game.physics.p2.enable(o.sprite);
-		o.sprite.body.kinematic = false;
-		o.sprite.body.motionState = Phaser.Physics.P2.Body.STATIC;
-		
-		selectObject(o);
-		
-		onModeChange(MODE_TRANSFORM);
+    function addPoint(x, y) {
+		curPoly.points[curPoly.points.length] = { x: x, y: y };
 	}
 	
 	// pass null to unselect all
-	function selectObject(obj) {					
+	function selectPoly(poly) {
+		selectedPoly = null;
+		scene.polys.forEach(function(p) {
+			if (p == poly) {
+				p.selected = true;
+				selectedPoly = poly;
+			}
+			else {
+				p.selected = false;
+			}
+		});
+
+		if (selectedPoly != null) {
+			propFields.props.name.value = selectedPoly.name;
+			propFields.show(true);
+		}
+		else {
+		    propFields.show(false);
+		}
+	}
+
+	function deleteSelectedPoly() {
+		for (var i = 0; i < scene.polys.length; ++i) {
+			if (scene.polys[i].selected) {
+				scene.polys.splice(i, 1);
+				break;
+			}
+		}
+
+		propFields.show(false);
+	}
+
+	function cancelCreatePoly() {
+		curPoly.points = [];
+	}
+
+
+
+	// -----------------------------------------------------------------------------------------------
+	// ASSETS & DYNAMIC OBJECTS
+
+	this.assets = new CAssetManager(game);
+
+	this.insertAsset = function(name) {
+		this.assets.loadAsset(name, function(assetName) {
+			var o = scene.addObject(name, assetName);
+			this.selectObject(o);
+			this.setMode(MODE_TRANSFORM);
+		}, this);
+	}
+
+
+	// pass null to unselect all
+	this.selectObject = function(obj) {
 		selectedObject = obj;
-	}	
+		selectPoly(null);
+		if (obj != null) {
+			propFields.props.name.value = obj.getName();
+			propFields.show(true);
+		}
+		else {
+			propFields.show(false);
+		}
+	}
+
+	this.getSelectedObject = function() {
+		return selectedObject;
+	}
 	
 	
 	
 	
+	
+
+	// -----------------------------------------------------------------------------------------------
+	// CONTROLLER:
+
+	this.onPropertyNameChange = function(newval) {
+		if (selectedObject != null)
+			selectedObject.setName(newval);
+		else if (selectedPoly != null)
+			selectedPoly.name = newval;
+	}
+
+
+
+
+	// -----------------------------------------------------------------------------------------------
 	// BACKGROUNDS:
-	
+
 	var backgroundsDiv = $('backgrounds');
 	var loadedBackgrounds = [];
-	
+
 	window.loadBackgrounds = function() {
 		var req = new XMLHttpRequest();
 		req.onreadystatechange = function() {
@@ -865,63 +649,537 @@ window.onload = function() {
 					s += "<div><button class='add-resource' onclick='setBackground(\"" + bg.name + "\",\"" + bg.file + "\")'>Use</button>" + bg.name + "</div>";
 				});
 				backgroundsDiv.innerHTML = s;
-			}			
+			}
 		}
-		req.open("GET", assetsDir + "backgrounds.json", true);
-		req.send();	
+		req.open("GET", editor.config.assetsDir + "backgrounds.json", true);
+		req.send();
 	}
-	
+
 	window.setBackground = function(name, file) {
 		if (!game.cache.checkImageKey(name)) {
-			game.load.image(name, assetsDir + file);			
+			game.load.image(name, editor.config.assetsDir + file);
 			game.load.onFileComplete.addOnce(function(progress, key) {
-					setSceneBackground(key);
+					scene.setBackground(key);
 				}, $this, 0);
 			game.load.start();
 		}
 		else {
-			setSceneBackground(name);
-		}	
+			scene.setBackground(name);
+		}
 	}
-	
+
+
+
+	// -----------------------------------------------------------------------------------------------
+	// LOGGING
+
+	this.log = function(msg) {
+		console.log("[Editor] " + msg);
+	}
+
+
+
+	this.init = function() {
+		// onConfigLoaded will trigger assets to be loaded
+		this.config.loadConfig();
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+	// -------------------------------------------------------------------------
+	// 		E x p o r t   /   I m p o r t
+	// -------------------------------------------------------------------------
+
+	this.dumpCode = function() {
+		var d = {
+			exportScreenWidth: game.width,
+			exportScreenHeight: game.height,
+			sceneBackground: scene.getBackgroundName(),
+			polygons: [],
+			objects: []
+		};
+		
+		// Serialize polygons:
+		scene.polys.forEach(function(poly) {
+			var p = d.polygons[d.polygons.length] = {
+				name: poly.name,
+				points: []
+			};
+			for (var i = 0; i < poly.points.length; ++i) {
+				p.points[p.points.length] = poly.points[i].x;
+				p.points[p.points.length] = poly.points[i].y;				
+			} 
+		});
+		
+		// Serialize objects:
+		d.objects = scene.serializeObjects();
+
+		var out = document.getElementById('output');	
+		out.value = JSON.stringify(d);
+	}
+
+	this.importCode = function() {
+		var code = document.getElementById('output').value;
+		var d = JSON.parse(code);
+		
+		// TODO: Make sure the code is correct and contains all necessary elements
+		
+		scene.clear();
+
+		var bgName = d.sceneBackground;
+		if (!game.cache.checkImageKey(bgName)) {
+			for (var i = 0; i < loadedBackgrounds.length; ++i) {
+				var loadedBackground = loadedBackgrounds[i];
+				if (loadedBackground.name == bgName) {
+					game.load.image(loadedBackground.name, editor.config.assetsDir + loadedBackground.file);
+					game.load.onFileComplete.addOnce(function(p, key) {
+						scene.setBackground(key);
+					}, $this, 0);
+					game.load.start();
+					break;
+				}				
+			}
+		}
+		else {
+			scene.setBackground(bgName);
+		}		
+		
+		var scale = {
+			x: game.width / d.exportScreenWidth,
+			y: game.height / d.exportScreenHeight
+		};
+		
+		// Import polys:
+		curPoly.points = [];
+		transformPoly = null;		
+		d.polygons.forEach(function(poly) {
+			var points = [];
+			for (var i = 0; i < poly.points.length; i += 2) {								
+				points[points.length] = {
+					x: poly.points[i] * scale.x,
+					y: poly.points[i + 1] * scale.y
+				}
+			}
+			
+			scene.addPoly(poly.name, points);
+		});
+
+		// Import objects:
+		transformObject = null;
+		scene.deserializeObjects(d.objects, this.assets, scale);
+
+		this.setMode(MODE_TRANSFORM);
+		selectPoly(null);
+		this.selectObject(null);
+	}
+};
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//		S c e n e
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// position - { x: ..., y: ... }
+// size - { w: ..., h: ... }
+// If both width and height of the size equal 0, the original image size is used
+var CObject = function(name, assetName, position, size, angle) {
+	// The creation-desc, set to null when the object was created properly
+	this.desc = {
+		name: name,
+		assetName: assetName,
+		position: (typeof position !== 'undefined' ? position : { x: 0, y: 0 }),
+		size: (typeof size !== 'undefined' ? size : { w: 0, h: 0 }),
+		angle: angle || 0
+	};
+
+	this.sprite = null;
+
+	// Create the phaser object
+	this.create = function(phaserGame) {
+		console.debug(this.desc);
+		this.sprite = phaserGame.add.sprite(this.desc.position.x, this.desc.position.y, this.desc.assetName);
+		if (this.desc.size.w != 0 || this.desc.size.h != 0) {
+			this.sprite.width = this.desc.size.w;
+			this.sprite.height = this.desc.size.h;
+		}
+
+		// Setup physics
+		phaserGame.physics.p2.enable(this.sprite);
+		this.sprite.body.kinematic = false;
+		this.sprite.body.motionState = Phaser.Physics.P2.Body.STATIC;
+
+		this.sprite.name = this.desc.name;
+		this.sprite.body.angle = this.desc.angle;
+
+		this.desc = null; // loaded
+	}
+
+	this.destroy = function() {
+		if (this.sprite != null)
+			this.sprite.destroy();
+	}
+
+	this.getName = function() {
+		return (this.sprite != null ? this.sprite.name : "<not-created>");
+	}
+
+	this.setName = function(name) {
+		if (this.sprite != null)
+			this.sprite.name = name;
+	}
+}
+
+var CScene = function(phaserGame) {
+	if (typeof phaserGame === 'undefined' || phaserGame == null) {
+		console.error("Cannot instantiate Scene: phaserGame parameter invalid!");
+		return false;
+	}
+	var game = phaserGame;
+
+	var bg;
+	this.objects = [];
+	this.polys = [];
+
+	// Call this in phaser create-callback
+	this.init = function() {
+		bg = game.add.image(0, 0);
+	}
+
+	// Deletes all objects and polys
+	this.clear = function() {
+		this.objects.forEach(function(obj) {
+			obj.sprite.destroy();
+		});
+
+		this.objects = [];
+		this.polys = [];
+	}
+
 	// name - the resource name of the scene background image, has to be loaded
-	function setSceneBackground(name) {		
+	this.setBackground = function(name) {
 		bg.loadTexture(name);
 		bg.width = game.width;
 		bg.height = game.height;
-	}	
+	}
+
+	this.getBackgroundName = function() {
+		return bg.key;
+	}
+
+	// Returns null if the object does not exist in the scene
+	this.getObject = function(name) {
+		for (var i = 0; i < this.objects.length; ++i) {
+			if (this.objects[i].name == name)
+				return this.objects[i];
+		}
+
+		return null;
+	}
+
+	// Adds the object to the scene with given name and the assetName of a LOADED asset.
+	// Returns reference to the new object.
+	this.addObject = function(name, assetName) {
+		var o = this.objects[this.objects.length] = new CObject(name, assetName, { x: game.width * 0.5, y: game.height * 0.5 });
+		o.create(game);
+		return o;
+	}
+
+	this.deleteObject = function(name) {
+		for (var i = 0; i < this.objects.length; ++i) {
+			if (this.objects[i].name == name) {
+				this.objects[i].destroy();
+				this.objects.splice(i, 1);
+				break;
+			}
+		}
+	}
+
+	// Returns array of exportable json data of the objects in the scene
+	this.serializeObjects = function() {
+		var d = [];
+		this.objects.forEach(function(obj) {
+			d[d.length] = {
+				name: obj.sprite.name,
+				position: { x: Math.round(obj.sprite.body.x), y: Math.round(obj.sprite.body.y) },
+				size: { w: Math.round(obj.sprite.width), h: Math.round(obj.sprite.height) },
+				angle: obj.sprite.body.angle,
+				asset: obj.sprite.key
+			};
+		});
+
+		return d;
+	}
+
+	// Loads objects and their assets and adds them to the scene.
+	// d - has to be an array of valid json data for each object
+	// loadScale - (optional) { x: 1.0, y: 1.0 } A factor multiplied to the size and position to properly scale into the canvas
+	this.deserializeObjects = function(d, assetMgr, loadScale) {
+		loadScale = loadScale || { x: 1.0, y: 1.0 };
+		for (var i = 0; i < d.length; ++i) {
+			var o = d[i];
+			var position = { x: o.position.x * loadScale.x, y: o.position.y * loadScale.y };
+			var size = { w: o.size.w * loadScale.x, h: o.size.h * loadScale.y };
+			var object = this.objects[this.objects.length] = new CObject(o.name, o.asset, position, size, o.angle);
+			if (assetMgr.isAssetLoaded(o.asset)) {
+				object.create(game);
+			}
+			else {
+				assetMgr.queueAsset(o.asset);
+			}
+		}
+
+		if (assetMgr.isLoadQueueFilled()) {
+			assetMgr.loadQueued(function() {
+				this.objects.forEach(function(obj) {
+					if (obj.sprite == null && assetMgr.isAssetLoaded(obj.desc.assetName))
+						obj.create(game);
+				});
+			}, this);
+		}
+	}
 
 
 
 
 
+	this.addPoly = function(name, points) {
+		 this.polys[this.polys.length] = {
+			points: points,
+			aabb: calculateAABB(points),
+			selected: false,
+			name: name
+		};
+	}
+	
+	// Returns poly that is hit by the given test-point
+	this.getHitPoly = function(point) {
+		for (var i = 0; i < this.polys.length; ++i) {
+			if (polyContainsPoint(this.polys[i], point))
+				return this.polys[i];
+		}
+
+		return null;
+	}
+}
 
 
-	// LOAD SYSTEM CONFIG
 
-	function loadConfig() {
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//		C o n f i g
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+var CEditorConfig = function() {
+	var $this = this;
+	
+	// TODO: Use more flexible config properties (Using getter & setter API)
+	this.assetsDir = "assets/";
+	
+	// Attempts to load config.json in editor root directory. Keeps the current values if this file was not found.
+	// When finished loading the config, this.onConfigLoaded() is called
+	this.loadConfig = function() {
 		var req = new XMLHttpRequest();
 		req.onreadystatechange = function() {
 			if (req.readyState == 4) {
-				if (req.state == 200) {
+				if (req.status == 200) {
 					var d = JSON.parse(req.responseText);
-					assetsDir = d.assetsDir;
+					$this.assetsDir = d.assetsDir;
+					editor.log("Loaded config file!");
 				}
 				else {
-					console.log("There is no custom config.json! Using defaults...");
+					editor.log("There is no custom config.json! Using defaults...");
 				}
 
-				onConfigLoaded();
+				$this.onConfigLoaded();
 			}
 		}
 		req.open("GET", "config.json", true);
 		req.onerror = function() {}
 		req.send();
 	}
-	loadConfig();
+	
+	// override this to handle your own events!
+	this.onConfigLoaded = function() {}
+}
 
-	function onConfigLoaded() {
-		loadAssets();
-		loadBackgrounds();
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//		A s s e t s
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+var CAssetManager = function(phaserGame) {
+	if (typeof phaserGame === 'undefined' || phaserGame == null) {
+		console.error("Cannot instantiate asset manager: phaserGame parameter invalid!");
+		return false;
 	}
-};
+	var game = phaserGame;
+	
+	var assetsDiv = $('assets');
+	var assets = [];
+	
+	var loadQueue = [];
+	var loadQueueCompleteCB = function() {}
+	
+	// Load assets.json from server - does not yet load the resources themselfs
+	this.loadAssetsList = function() {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4 && req.status == 200) {
+				var d = JSON.parse(req.responseText);
+				var s = "";
+				assets = d;
+				d.forEach(function(asset) {
+					s += "<div><button class='add-resource' onclick='editor.insertAsset(\"" + asset.name + "\")'>Add</button>" + asset.name + "</div>";
+				});
+				assetsDiv.innerHTML = s;
+			}			
+		}
+		req.open("GET", editor.config.assetsDir + "assets.json", true);
+		req.send();
+	}
+	
+	this.getAsset = function(name) {
+		for (var i = 0; i < assets.length; ++i) {
+			if (assets[i].name == name)
+				return assets[i];
+		}
+
+		return null;
+	}
+
+	this.isAssetKnown = function(name) {
+		for (var i = 0; i < assets.length; ++i) {
+			if (assets[i].name == name)
+				return true;
+		}
+
+		return false;
+	}
+	
+	this.isAssetLoaded = function(name) {
+		return game.cache.checkImageKey(name);
+	}
+	
+	// Makes sure the asset is loaded. If it is already loaded, this function does nothing
+	// If you want to load multiple assets, queueAsset() might be faster and more reliable
+	this.loadAsset = function(name, onload, scope) {
+		if (this.isAssetLoaded(name)) {
+			if (typeof onload === 'function')
+				onload.call(scope, name);
+			return true;
+		}
+		
+		var asset = this.getAsset(name);
+		if (asset == null) {
+			editor.log("Cannot load asset: '" + name + "' not known");
+			return false; // not known
+		}
+		
+		game.load.image(asset.name, editor.config.assetsDir + asset.file);
+		game.load.onFileComplete.addOnce(function(p, key) {
+			onload.call(scope, key);
+		});
+		game.load.start();
+	}
+	
+	
+	// Queues an asset to be loaded when loadQueued() is called
+	this.queueAsset = function(name) {
+		if (this.isAssetLoaded(name))
+			return true;
+
+		for (var i = 0; i < loadQueue.length; ++i) {
+			if (loadQueue[i].name == name)
+				return true; // already queued
+		}
+
+		var asset = this.getAsset(name);
+		if (asset == null) {
+			editor.log("Cannot queue asset for load: '" + name + "' not known!");
+			return false;
+		}
+
+		loadQueue[loadQueue.length] = asset;
+	}
+	
+	this.isLoadQueueFilled = function() {
+		return (loadQueue.length > 0);
+	}
+	
+	// Loads all assets that are queued to load.
+	// When finished with all assets, callback is called on the given scope if specified.
+	this.loadQueued = function(callback, scope) {
+		if (loadQueue.length == 0) {
+			if (typeof callback === 'function')
+				callback.call(scope);
+			return true;
+		}
+
+		loadQueue.forEach(function(asset) {
+			game.load.image(asset.name, editor.config.assetsDir + asset.file);
+		});
+
+		loadQueueCompleteCB = function(p, key) {
+			for (var i = 0; i < loadQueue.length; ++i) {
+				if (key == loadQueue[i].name) {
+					loadQueue.splice(i, 1);
+					break;
+				}
+			}
+
+			if (loadQueue.length == 0) {
+				if (typeof callback === 'function')
+					callback.call(scope);
+
+				game.load.onFileComplete.remove(loadQueueCompleteCB);
+			}
+		}
+
+		game.load.onFileComplete.add(loadQueueCompleteCB, this);
+		game.load.start();
+	}
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//		G U I
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+var CPropertyFields = function() {
+	var container = $('properties');
+	this.props = {
+		name: $('prop-name')
+	};
+
+	this.props.name.onkeyup = function() {
+		editor.onPropertyNameChange(this.value);
+	}
+
+	this.show = function(show) {
+		container.style.display = (show ? 'block' : 'none');
+	}
+}
+
+
+window.onload = function() {
+	window.editor = new CEditor();
+	window.editor.init();
+}
