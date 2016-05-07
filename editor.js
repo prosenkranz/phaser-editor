@@ -118,10 +118,12 @@ CEditor = function() {
 	
 	this.config = new CEditorConfig();
 	this.config.onConfigLoaded = function() {
+		scenes.loadScenes();
 		editor.assets.loadAssetsList();
 		loadBackgrounds();
 	}
 
+	var scenes = new CSceneManager();
 	var scene = new CScene(game);
 	var selectedPoly = null;
 	var curPoly = {
@@ -689,17 +691,12 @@ CEditor = function() {
 
 
 
-
-
-
-
-
-
 	// -------------------------------------------------------------------------
 	// 		E x p o r t   /   I m p o r t
 	// -------------------------------------------------------------------------
 
-	this.dumpCode = function() {
+	// Returns the scene as a json string
+	var serializeScene = function() {
 		var d = {
 			exportScreenWidth: game.width,
 			exportScreenHeight: game.height,
@@ -707,7 +704,7 @@ CEditor = function() {
 			polygons: [],
 			objects: []
 		};
-		
+
 		// Serialize polygons:
 		scene.polys.forEach(function(poly) {
 			var p = d.polygons[d.polygons.length] = {
@@ -716,19 +713,23 @@ CEditor = function() {
 			};
 			for (var i = 0; i < poly.points.length; ++i) {
 				p.points[p.points.length] = poly.points[i].x;
-				p.points[p.points.length] = poly.points[i].y;				
-			} 
+				p.points[p.points.length] = poly.points[i].y;
+			}
 		});
-		
+
 		// Serialize objects:
 		d.objects = scene.serializeObjects();
 
-		var out = document.getElementById('output');	
-		out.value = JSON.stringify(d);
+		return JSON.stringify(d);
 	}
 
-	this.importCode = function() {
-		var code = document.getElementById('output').value;
+	this.dumpCode = function() {
+		var out = document.getElementById('output');	
+		out.value = serializeScene();
+	}
+
+	this.importCode = function(code) {
+		code = code || $('output').value;
 		var d = JSON.parse(code);
 		
 		// TODO: Make sure the code is correct and contains all necessary elements
@@ -781,6 +782,18 @@ CEditor = function() {
 		selectPoly(null);
 		this.selectObject(null);
 	}
+
+
+
+	this.loadScene = function(name) {
+		scenes.loadScene(name, function(code) {
+			this.importCode(code);
+		}, this);
+	}
+
+	this.saveScene = function(name) {
+		scenes.saveScene(name, serializeScene());
+	}
 };
 
 
@@ -808,7 +821,6 @@ var CObject = function(name, assetName, position, size, angle) {
 
 	// Create the phaser object
 	this.create = function(phaserGame) {
-		console.debug(this.desc);
 		this.sprite = phaserGame.add.sprite(this.desc.position.x, this.desc.position.y, this.desc.assetName);
 		if (this.desc.size.w != 0 || this.desc.size.h != 0) {
 			this.sprite.width = this.desc.size.w;
@@ -971,6 +983,65 @@ var CScene = function(phaserGame) {
 		}
 
 		return null;
+	}
+}
+
+
+
+var CSceneManager = function() {
+	var scenesDiv = $('scenes');
+
+	this.loadScenes = function() {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4 && req.status == 200) {
+				var scenes = JSON.parse(req.responseText);
+				var s = "";
+				scenes.forEach(function(scene) {
+					s += "<div id='scene-" + scene + "'>"
+						+ "<button class='add-resource' onclick='editor.loadScene(\"" + scene + "\")'>Load</button>"
+						+ scene
+						+ "<button class='btn-resource-right' onclick='editor.saveScene(\"" + scene + "\")'>Save</button>"
+						+"</div>";
+				});
+
+				scenesDiv.innerHTML = s;
+			}
+		}
+		req.open("GET", "scenes.php", true);
+		req.onerror = function() {}
+		req.send();
+	}
+
+	// Loads the scene code and calls the callback with the scene code as string parameter:
+	// function callback(code) { var data = JSON.decode(code); ... }
+	this.loadScene = function(name, callback, callbackScope) {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4 && req.status == 200) {
+				callback.call(callbackScope, req.responseText);
+
+				for (var i = 0; i < scenesDiv.childNodes.length; ++i) {
+					var item = scenesDiv.childNodes[i];
+					item.className = (item.id == "scene-" + name ? "loaded" : "");
+				}
+			}
+		}
+		req.open("GET", "scenes.php?name=" + name, true);
+		req.onerror = function() {}
+		req.send();
+	}
+
+	this.saveScene = function(name, data) {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4 && req.status == 200)
+				editor.log("Saved scene '" + name + ".json' successfully!");
+		}
+		req.open("POST", "scenes.php", true);
+		req.setRequestHeader("Content-type", "application/x-www-form-urlencoded")
+		req.onerror = function() {}
+		req.send("save=" + name + "&json=" + data);
 	}
 }
 

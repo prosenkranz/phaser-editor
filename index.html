@@ -52,10 +52,12 @@
 		button:hover {
 			background-color: #999;
 		}
-		button.add-resource {
-			padding: 0px 5px;
+		.resourcelist button {
+			display: inline-block;
+			padding: 0px 8px;
 			margin-right: 5px;
-			font-size: 11px;
+			font-size: 12px;
+			vertical-align: middle;
 		}
 		label {
 			font-size: 11px;
@@ -85,6 +87,21 @@
 		.resourcelist > div:nth-child(odd) {
 			background-color: #444; 
 		}
+
+		.resourcelist .btn-resource-right {
+			display: none;
+		}
+		.resourcelist > .loaded,
+		.resourcelist > .loaded:nth-child(odd) {
+			background-color: #8f8;
+			color: #000;
+		}
+		.resourcelist .loaded .btn-resource-right {
+			display: inline-block;
+			margin-top: 2px;
+			float: right;
+		}
+
 		#editlayer-select {
 			margin-bottom: 20px;
 		}
@@ -135,6 +152,11 @@
 
 		<div><strong>Backgrounds:</strong></div>
 		<div id="backgrounds" class="resourcelist"></div>
+
+		<br />
+
+		<div><strong>Scenes:</strong></div>
+		<div id="scenes" class="resourcelist"></div>
 	</div>
 </body>
 </html>
