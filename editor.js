@@ -19,7 +19,7 @@ function $(id) {
 function getModeName(mode) {
 	switch (mode) {
 		case MODE_TRANSFORM: return "Select/Transform";
-		case MODE_CREATE: return "Create";		
+		case MODE_CREATE: return "Create";
 		case MODE_EDIT: return "Edit";
 		default: "Unknown";
 	}
@@ -44,8 +44,8 @@ function calculateAABB(points) {
 			if (point.y > bb.max.y) bb.max.y = point.y;
 		});
 	}
-	
-	return bb;				
+
+	return bb;
 }
 
 function offsetAABB(aabb, v) {
@@ -59,7 +59,7 @@ function offsetAABB(aabb, v) {
 // point = { x: ..., y: ... }
 function aabbContainsPoint(aabb, point) {
 	return (point.x >= aabb.min.x && point.x <= aabb.max.x
-		&& point.y >= aabb.min.y && point.y <= aabb.max.y);		
+		&& point.y >= aabb.min.y && point.y <= aabb.max.y);
 }
 
 function polyContainsPoint(poly, point) {
@@ -67,13 +67,13 @@ function polyContainsPoint(poly, point) {
 		return false;
 	if (!aabbContainsPoint(poly.aabb, point))
 		return false;
-	
+
 	// TODO: Don't re-fill this array for each hit test. Instead, fill up this array when poly is stored
 	var pps = [];
 	for (var i = 0; i < poly.points.length; ++i) {
 		pps[pps.length] = new Phaser.Point(poly.points[i].x, poly.points[i].y);
 	}
-		
+
 	var phPoly = new Phaser.Polygon(pps);
 	return phPoly.contains(point.x, point.y);
 }
@@ -91,13 +91,13 @@ function mouseHoversDragpoint(mousePos, dragPoint, pointRadius, objCenter, objAn
 	// Rotate point around object center
 	var point = new Phaser.Point(dragPoint.x, dragPoint.y);
 	point = point.rotate(objCenter.x, objCenter.y, objAngle, true);
-	
+
 	// Do hit-test
 	var pp = {
 		x: point.x - mousePos.x,
 		y: point.y - mousePos.y
 	};
-	return (pp.x * pp.x + pp.y * pp.y <= pointRadius * pointRadius);	
+	return (pp.x * pp.x + pp.y * pp.y <= pointRadius * pointRadius);
 }
 
 
@@ -106,16 +106,16 @@ function mouseHoversDragpoint(mousePos, dragPoint, pointRadius, objCenter, objAn
 
 
 CEditor = function() {
-	
+
 	var WIDTH = 1100;
 	var HEIGHT = WIDTH * 9 / 16;
-	
+
 	var $this = this;
-	
+
 	var game = new Phaser.Game(WIDTH, HEIGHT, Phaser.CANVAS, 'editor', { preload: preload, create: create, update: update, render: render });
-	
+
 	var propFields = new CPropertyFields();
-	
+
 	this.config = new CEditorConfig();
 	this.config.onConfigLoaded = function() {
 		scenes.loadScenes();
@@ -129,20 +129,20 @@ CEditor = function() {
 	var curPoly = {
 		points: []
 	};
-	
+
 	var selectedObject = null;
 	var scalePointHovered = false;
 	var rotatePointHovered = false;
 	var rotating = false;
 	var scaling = false;
-	
+
 	var mode;
 
 	var pointHelperSz = 10;
-	
-	var transformOldPos = { x: 0, y: 0 };	
+
+	var transformOldPos = { x: 0, y: 0 };
 	var transformPoly = null;
-	var transformPoint = null;	
+	var transformPoint = null;
 	var focusPoint = null; // for edit mode
 	var focusPoly = null; // poly of focusPoint
 	var transformObject = null;
@@ -150,20 +150,20 @@ CEditor = function() {
 	this.getCanvasSize = function() {
 		return { w: game.width, h: game.height };
 	}
-	
 
-	
+
+
 	// -------------------------------------------------------------------------
 	// 		P r e l o a d
 	// -------------------------------------------------------------------------
-	function preload() {		
-		game.load.image('no-scene-background', 'no-scene-background.jpg');		
+	function preload() {
+		game.load.image('no-scene-background', 'no-scene-background.jpg');
 	}
 
 	// -------------------------------------------------------------------------
 	// 		C r e a t e
-	// -------------------------------------------------------------------------	
-	function create() {		
+	// -------------------------------------------------------------------------
+	function create() {
 		game.clearBeforeRender = false;
 		game.physics.startSystem(Phaser.Physics.P2JS);
 
@@ -172,32 +172,32 @@ CEditor = function() {
 
 		game.input.onDown.add(onMouseDown, $this);
 		game.input.onUp.add(onMouseUp, $this);
-		
+
 		polys = new Array();
 		$this.setMode(MODE_CREATE);
-		
+
 		game.input.keyboard.addKey(Phaser.Keyboard.ONE).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_TRANSFORM); }, $this);
 		game.input.keyboard.addKey(Phaser.Keyboard.TWO).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_CREATE); }, $this);
 		game.input.keyboard.addKey(Phaser.Keyboard.THREE).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_EDIT); }, $this);
 		game.input.keyboard.addKey(Phaser.Keyboard.DELETE).onDown.add(function() { if (document.activeElement != document.body) return; onDeleteButton(); }, $this);
 		game.input.keyboard.addKey(Phaser.Keyboard.ESC).onDown.add(function() { if (document.activeElement != document.body) return; cancelCreatePoly(); }, $this);
-		
+
 		game.input.keyboard.removeKeyCapture(Phaser.Keyboard.ONE);
-    	game.input.keyboard.removeKeyCapture(Phaser.Keyboard.TWO);
-    	game.input.keyboard.removeKeyCapture(Phaser.Keyboard.THREE);
-		game.input.keyboard.removeKeyCapture(Phaser.Keyboard.DELETE);							
-	}	
-	
-	
+		game.input.keyboard.removeKeyCapture(Phaser.Keyboard.TWO);
+		game.input.keyboard.removeKeyCapture(Phaser.Keyboard.THREE);
+		game.input.keyboard.removeKeyCapture(Phaser.Keyboard.DELETE);
+	}
+
+
 	// -------------------------------------------------------------------------
 	// 		U p d a t e
 	// -------------------------------------------------------------------------
-	function update() {		
+	function update() {
 		var mousePos = {
 			x: game.input.activePointer.x,
 			y: game.input.activePointer.y
 		};
-		
+
 		if (mode == MODE_EDIT) {
 			if (focusPoint == null || !mouseHoversPoint(mousePos, focusPoint, POINT_HELPER_SIZE)) {
 				focusPoint = null;
@@ -207,7 +207,7 @@ CEditor = function() {
 				for (var i = 0; i < scene.polys.length; ++i) {
 					var poly = scene.polys[i];
 					if (aabbContainsPoint(offsetAABB(poly.aabb, POINT_HELPER_SIZE * 0.5), mousePos)) {
-					    var found = false;
+						var found = false;
 						for (var j = 0; j < poly.points.length; ++j) {
 							if (mouseHoversPoint(mousePos, poly.points[j], POINT_HELPER_SIZE)) {
 								found = true;
@@ -216,60 +216,60 @@ CEditor = function() {
 								break;
 							}
 						}
-						
+
 						if (found)
 							break;
-					}																
+					}
 				}
-			}						
+			}
 		}
-		
+
 		if (mode == MODE_TRANSFORM && selectedObject != null) {
 			rotatePointHovered = false;
-			scalePointHovered = false;            
+			scalePointHovered = false;
 
 			var sprite = selectedObject.sprite;
 			var objPos = { x: sprite.body.x, y: sprite.body.y };
 			var objSz = { w: sprite.width, h: sprite.height };
-			var objAngle = sprite.body.angle;									
-				
-			if (mouseHoversDragpoint(mousePos, {x: objPos.x, y: objPos.y - objSz.h * 0.5}, DRAGPOINT_HELPER_RADIUS, objPos, objAngle)) {			
-				rotatePointHovered = true;								
+			var objAngle = sprite.body.angle;
+
+			if (mouseHoversDragpoint(mousePos, {x: objPos.x, y: objPos.y - objSz.h * 0.5}, DRAGPOINT_HELPER_RADIUS, objPos, objAngle)) {
+				rotatePointHovered = true;
 			}
-			else if (mouseHoversDragpoint(mousePos, { x: objPos.x + objSz.w * 0.5, y: objPos.y + objSz.h * 0.5 }, DRAGPOINT_HELPER_RADIUS, objPos, objAngle)) {								
-				scalePointHovered = true;				
+			else if (mouseHoversDragpoint(mousePos, { x: objPos.x + objSz.w * 0.5, y: objPos.y + objSz.h * 0.5 }, DRAGPOINT_HELPER_RADIUS, objPos, objAngle)) {
+				scalePointHovered = true;
 			}
 		}
-		
-		if (game.input.activePointer.isDown) {			
+
+		if (game.input.activePointer.isDown) {
 			if (mode == MODE_TRANSFORM) {
 				var diff = { x: mousePos.x - transformOldPos.x, y: mousePos.y - transformOldPos.y };
 
-                // Transform poly
-				if (transformPoly != null) {										
+				// Transform poly
+				if (transformPoly != null) {
 					for (var i = 0; i < transformPoly.points.length; ++i) {
 						transformPoly.points[i].x += diff.x;
-						transformPoly.points[i].y += diff.y;				
+						transformPoly.points[i].y += diff.y;
 					}
 					transformPoly.aabb.min.x += diff.x;
 					transformPoly.aabb.min.y += diff.y;
 					transformPoly.aabb.max.x += diff.x;
-					transformPoly.aabb.max.y += diff.y;				
+					transformPoly.aabb.max.y += diff.y;
 					transformOldPos = mousePos;
 				}
-				
+
 				// Transform object
 				if (transformObject != null) {
 					var center = { x: transformObject.sprite.body.x, y: transformObject.sprite.body.y };
 					var c2m = new Phaser.Point(mousePos.x - center.x, mousePos.y - center.y); // center to mouse
 					if (rotating) {
-					    // Rotate object
+						// Rotate object
 						var up = new Phaser.Point(0, -1);
 						var alpha = Math.acos(up.dot(c2m.normalize())) * 180.0 / Math.PI;
 						if (mousePos.x < center.x)
 							alpha = 360 - alpha;
-						
-						transformObject.sprite.body.angle = alpha;												
+
+						transformObject.sprite.body.angle = alpha;
 					}
 					else if (scaling) {
 						// Scale object
@@ -280,21 +280,21 @@ CEditor = function() {
 						transformObject.sprite.width = diag.x;
 						transformObject.sprite.height = diag.y;
 						transformObject.sprite.body.setRectangle(diag.x, diag.y);
-						
+
 						var newCenter = topLeft.add(diag.x * 0.5, diag.y * 0.5);
 						newCenter = newCenter.rotate(0, 0, transformObject.sprite.body.angle, true);
 						transformObject.sprite.body.x += newCenter.x;
 						transformObject.sprite.body.y += newCenter.y;
 					}
-					else {					
+					else {
 						// Translate object
 						transformObject.sprite.body.x += diff.x;
-						transformObject.sprite.body.y += diff.y;						
+						transformObject.sprite.body.y += diff.y;
 					}
 					transformOldPos = mousePos;
-				}										
+				}
 			}
-						
+
 			if (mode == MODE_EDIT && transformPoint != null && transformPoly != null) {
 				// Transform point
 				var diff = { x: mousePos.x - transformOldPos.x, y: mousePos.y - transformOldPos.y };
@@ -302,10 +302,10 @@ CEditor = function() {
 				transformPoint.y += diff.y;
 				transformPoly.aabb = calculateAABB(transformPoly.points);
 				transformOldPos = mousePos;
-			}					
-		}		
-	}	
-	
+			}
+		}
+	}
+
 
 	// -------------------------------------------------------------------------
 	// 		O n   M o u s e   D o w n
@@ -315,8 +315,8 @@ CEditor = function() {
 		var pos = {
 			x: game.input.mousePointer.x,
 			y: game.input.mousePointer.y
-		}		
-		
+		}
+
 		if (mode == MODE_CREATE) {
 			selectPoly(null);
 			if (curPoly.points.length > 0) {
@@ -325,25 +325,25 @@ CEditor = function() {
 				var boundRect = new Phaser.Rectangle(p0.x - pointHelperSz * 0.5, p0.y - pointHelperSz * 0.5, pointHelperSz, pointHelperSz);
 				if (Phaser.Rectangle.containsPoint(boundRect, new Phaser.Point(pos.x, pos.y))) {
 					// Add poly
-					var points = curPoly.points.slice(0); // clone 
+					var points = curPoly.points.slice(0); // clone
 					scene.addPoly('polygon', points);
 					curPoly.points = [];
-					
+
 					// Immediately select it
 					selectPoly(scene.polys[scene.polys.length - 1]);
-					
+
 					this.setMode(MODE_TRANSFORM);
-					
+
 					return;
 				}
 			}
-				
+
 			addPoint(pos.x, pos.y);
 		}
-		
+
 		if (mode == MODE_TRANSFORM) {
 			var found = false;
-			
+
 			// handle dragpoints
 			if (selectedObject != null) {
 				if (rotating || scaling) {
@@ -356,13 +356,13 @@ CEditor = function() {
 					rotating = rotatePointHovered;
 					scaling = scalePointHovered;
 				}
-			}			
+			}
 
 			// Handle object selection
-			if (!found) {			
+			if (!found) {
 				for (var i = 0; i < objects.length; ++i) {
 					var intersected = game.physics.p2.hitTest(pos, [ objects[i].sprite ]);
-					if (intersected.length !== 0) {					
+					if (intersected.length !== 0) {
 						this.selectObject(objects[i]);
 						transformObject = selectedObject;
 						transformOldPos = pos;
@@ -371,10 +371,10 @@ CEditor = function() {
 					}
 				}
 			}
-			
+
 			if (!found)
 				this.selectObject(null);
-			
+
 			// Handle poly selection
 			if (!found) {
 				var hitPoly = scene.getHitPoly(pos);
@@ -383,16 +383,16 @@ CEditor = function() {
 					transformOldPos = pos;
 					transformPoly = hitPoly;
 				}
-			}			
+			}
 		}
-		
-		if (mode == MODE_EDIT && focusPoint != null && focusPoly != null) {			
+
+		if (mode == MODE_EDIT && focusPoint != null && focusPoly != null) {
 			transformPoint = focusPoint;
 			transformPoly = focusPoly;
-			transformOldPos = pos;			
+			transformOldPos = pos;
 		}
 	}
-	
+
 	// -------------------------------------------------------------------------
 	// 		O n   M o u s e    U p
 	// -------------------------------------------------------------------------
@@ -404,7 +404,7 @@ CEditor = function() {
 		rotating = false;
 		scaling = false;
 	}
-	
+
 
 	// -------------------------------------------------------------------------
 	// 		K e y b o a r d   E v e n t s
@@ -423,28 +423,28 @@ CEditor = function() {
 
 	// -------------------------------------------------------------------------
 	// 		R e n d e r
-	// -------------------------------------------------------------------------	
-	function render() {		
+	// -------------------------------------------------------------------------
+	function render() {
 		game.context.globalAlpha = 1.0;
-	
+
 		// Render polys
 		if (scene.polys.length > 0) {
 			scene.polys.forEach(function(poly) {
 				var polyStyle;
 				if (poly.selected)
-			 		polyStyle = { outlineColor: '#dd2', helperColor: '#dd4', closeOutline: true };
-			 	else if (mode == MODE_EDIT)
-			 		polyStyle = { outlineColor: '#d2d', helperColor: '#d4d', closeOutline: true };
+					 polyStyle = { outlineColor: '#dd2', helperColor: '#dd4', closeOutline: true };
+				 else if (mode == MODE_EDIT)
+					 polyStyle = { outlineColor: '#d2d', helperColor: '#d4d', closeOutline: true };
 				else
 					polyStyle = { outlineColor: '#22d', helperColor: '#44d', closeOutline: true };
-								
+
 				drawPoly(poly.points, polyStyle);
 			});
 		}
-	
-		// Render Edit-Poly		
+
+		// Render Edit-Poly
 		if (curPoly.points.length > 0)
-			drawPoly(curPoly.points, { outlineColor: '#f00', helperColor: '#f00', closeOutline: false });		
+			drawPoly(curPoly.points, { outlineColor: '#f00', helperColor: '#f00', closeOutline: false });
 
 		// Render selected Object helper
 		var ctx = game.context;
@@ -456,52 +456,52 @@ CEditor = function() {
 			ctx.translate(body.x, body.y);
 			ctx.rotate(body.angle * Math.PI/180);
 
-			// draw OBB						
+			// draw OBB
 			ctx.strokeStyle = "#f33";
 			ctx.lineWidth = 2;
 			ctx.strokeRect(-sprite.width * 0.5, -sprite.height * 0.5, sprite.width, sprite.height);
-			
-			// draw rotation drag point			
+
+			// draw rotation drag point
 			ctx.fillStyle = (rotatePointHovered ? "#66f" : "#00f");
-			drawDragpoint(0, -sprite.height * 0.5);			
-			
+			drawDragpoint(0, -sprite.height * 0.5);
+
 			// draw scale drag box
 			ctx.fillStyle = (scalePointHovered ? "#afa" : "#0f0");
-			drawDragpoint(sprite.width * 0.5, sprite.height * 0.5);			
-			 
+			drawDragpoint(sprite.width * 0.5, sprite.height * 0.5);
+
 			game.debug.text("angle = " + body.angle, 10, 30);
-			
+
 			ctx.restore();
 		}
 
-				
+
 		game.debug.text("mode = " + getModeName(mode), 10, 15);
 	}
-	
+
 	function drawDragpoint(x, y) {
 		var ctx = game.context;
 		ctx.beginPath();
 		ctx.arc(x, y, DRAGPOINT_HELPER_RADIUS, 0, 2 * Math.PI);
 		ctx.fill();
 	}
-	
+
 	// Does NOT close the path
 	function drawPath(points) {
 		game.context.beginPath();
 		game.context.moveTo(points[0].x, points[0].y);
 		for (var i = 1; i < points.length; ++i) {
 			game.context.lineTo(points[i].x, points[i].y);
-		}					
+		}
 	}
-	
+
 	// style - defines render style: outlineColor, helperColor, closeOutline, selected
 	function drawPoly(points, style) {
-		// draw the poly		
+		// draw the poly
 		game.context.fillStyle = "rgba(0, 0, 0, 0.3)";
 		drawPath(points);
 		game.context.closePath();
 		game.context.fill();
-		
+
 		// draw (unfinished) poly outline
 		game.context.lineWidth = 1;
 		game.context.setLineDash([10, 5]);
@@ -510,14 +510,14 @@ CEditor = function() {
 		if (style.closeOutline)
 			game.context.closePath();
 		game.context.stroke();
-											
-		// draw point helpers		
-		points.forEach(function(point) {			
-			game.context.fillStyle = (point == focusPoint ? "#ff0" : style.helperColor);					
+
+		// draw point helpers
+		points.forEach(function(point) {
+			game.context.fillStyle = (point == focusPoint ? "#ff0" : style.helperColor);
 			game.context.fillRect(
 				point.x - pointHelperSz * 0.5, point.y - pointHelperSz * 0.5,
 				pointHelperSz, pointHelperSz);
-		});		
+		});
 	}
 
 
@@ -530,10 +530,10 @@ CEditor = function() {
 
 
 
-    // -----------------------------------------------------------------------------------------------
-    // EDIT MODE
+	// -----------------------------------------------------------------------------------------------
+	// EDIT MODE
 
-    this.setMode = function(newMode) {
+	this.setMode = function(newMode) {
 		cancelCreatePoly();
 		mode = newMode;
 
@@ -543,8 +543,8 @@ CEditor = function() {
 		}
 
 		if (mode != MODE_EDIT) {
-		    focusPoint = null;
-		    transformPoint = null;
+			focusPoint = null;
+			transformPoint = null;
 		}
 
 		var modeTxt = document.getElementById('mode');
@@ -558,10 +558,10 @@ CEditor = function() {
 	// -----------------------------------------------------------------------------------------------
 	// POLYGONS
 
-    function addPoint(x, y) {
+	function addPoint(x, y) {
 		curPoly.points[curPoly.points.length] = { x: x, y: y };
 	}
-	
+
 	// pass null to unselect all
 	function selectPoly(poly) {
 		selectedPoly = null;
@@ -580,7 +580,7 @@ CEditor = function() {
 			propFields.show(true);
 		}
 		else {
-		    propFields.show(false);
+			propFields.show(false);
 		}
 	}
 
@@ -631,11 +631,11 @@ CEditor = function() {
 	this.getSelectedObject = function() {
 		return selectedObject;
 	}
-	
-	
-	
-	
-	
+
+
+
+
+
 
 	// -----------------------------------------------------------------------------------------------
 	// CONTROLLER:
@@ -740,16 +740,16 @@ CEditor = function() {
 	}
 
 	this.dumpCode = function() {
-		var out = document.getElementById('output');	
+		var out = document.getElementById('output');
 		out.value = serializeScene();
 	}
 
 	this.importCode = function(code) {
 		code = code || $('output').value;
 		var d = JSON.parse(code);
-		
+
 		// TODO: Make sure the code is correct and contains all necessary elements
-		
+
 		scene.clear();
 
 		var bgName = d.sceneBackground;
@@ -763,30 +763,30 @@ CEditor = function() {
 					}, $this, 0);
 					game.load.start();
 					break;
-				}				
+				}
 			}
 		}
 		else {
 			scene.setBackground(bgName);
-		}		
-		
+		}
+
 		var scale = {
 			x: game.width / d.exportScreenWidth,
 			y: game.height / d.exportScreenHeight
 		};
-		
+
 		// Import polys:
 		curPoly.points = [];
-		transformPoly = null;		
+		transformPoly = null;
 		d.polygons.forEach(function(poly) {
 			var points = [];
-			for (var i = 0; i < poly.points.length; i += 2) {								
+			for (var i = 0; i < poly.points.length; i += 2) {
 				points[points.length] = {
 					x: poly.points[i] * scale.x,
 					y: poly.points[i + 1] * scale.y
 				}
 			}
-			
+
 			scene.addPoly(poly.name, points);
 		});
 
@@ -990,7 +990,7 @@ var CScene = function(phaserGame) {
 			name: name
 		};
 	}
-	
+
 	// Returns poly that is hit by the given test-point
 	this.getHitPoly = function(point) {
 		for (var i = 0; i < this.polys.length; ++i) {
@@ -1071,10 +1071,10 @@ var CSceneManager = function() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 var CEditorConfig = function() {
 	var $this = this;
-	
+
 	// TODO: Use more flexible config properties (Using getter & setter API)
 	this.assetsDir = "assets/";
-	
+
 	// Attempts to load config.json in editor root directory. Keeps the current values if this file was not found.
 	// When finished loading the config, this.onConfigLoaded() is called
 	this.loadConfig = function() {
@@ -1097,7 +1097,7 @@ var CEditorConfig = function() {
 		req.onerror = function() {}
 		req.send();
 	}
-	
+
 	// override this to handle your own events!
 	this.onConfigLoaded = function() {}
 }
@@ -1116,13 +1116,13 @@ var CAssetManager = function(phaserGame) {
 		return false;
 	}
 	var game = phaserGame;
-	
+
 	var assetsDiv = $('assets');
 	var assets = [];
-	
+
 	var loadQueue = [];
 	var loadQueueCompleteCB = function() {}
-	
+
 	// Load assets.json from server - does not yet load the resources themselfs
 	this.loadAssetsList = function() {
 		var req = new XMLHttpRequest();
@@ -1135,12 +1135,12 @@ var CAssetManager = function(phaserGame) {
 					s += "<div><button class='add-resource' onclick='editor.insertAsset(\"" + asset.name + "\")'>Add</button>" + asset.name + "</div>";
 				});
 				assetsDiv.innerHTML = s;
-			}			
+			}
 		}
 		req.open("GET", editor.config.assetsDir + "assets.json", true);
 		req.send();
 	}
-	
+
 	this.getAsset = function(name) {
 		for (var i = 0; i < assets.length; ++i) {
 			if (assets[i].name == name)
@@ -1158,11 +1158,11 @@ var CAssetManager = function(phaserGame) {
 
 		return false;
 	}
-	
+
 	this.isAssetLoaded = function(name) {
 		return game.cache.checkImageKey(name);
 	}
-	
+
 	// Makes sure the asset is loaded. If it is already loaded, this function does nothing
 	// If you want to load multiple assets, queueAsset() might be faster and more reliable
 	this.loadAsset = function(name, onload, scope) {
@@ -1171,21 +1171,21 @@ var CAssetManager = function(phaserGame) {
 				onload.call(scope, name);
 			return true;
 		}
-		
+
 		var asset = this.getAsset(name);
 		if (asset == null) {
 			editor.log("Cannot load asset: '" + name + "' not known");
 			return false; // not known
 		}
-		
+
 		game.load.image(asset.name, editor.config.assetsDir + asset.file);
 		game.load.onFileComplete.addOnce(function(p, key) {
 			onload.call(scope, key);
 		});
 		game.load.start();
 	}
-	
-	
+
+
 	// Queues an asset to be loaded when loadQueued() is called
 	this.queueAsset = function(name) {
 		if (this.isAssetLoaded(name))
@@ -1204,11 +1204,11 @@ var CAssetManager = function(phaserGame) {
 
 		loadQueue[loadQueue.length] = asset;
 	}
-	
+
 	this.isLoadQueueFilled = function() {
 		return (loadQueue.length > 0);
 	}
-	
+
 	// Loads all assets that are queued to load.
 	// When finished with all assets, callback is called on the given scope if specified.
 	this.loadQueued = function(callback, scope) {
