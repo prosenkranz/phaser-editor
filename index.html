@@ -70,6 +70,8 @@
 			background-color: #b4b4b4;
 			padding: 2px 5px;
 		}
+		input::-webkit-input-placeholder { color: #666; }
+		input:-moz-placeholder { color: #666; }
 		input[type=text]:hover {
 			background-color: #d0d0d0;
 		}
@@ -90,6 +92,11 @@
 
 		.resourcelist .btn-resource-right {
 			display: none;
+			margin-top: 2px;
+			float: right;
+		}
+		.resourcelist .btn-resource-right.always {
+			display: inline-block;
 		}
 		.resourcelist > .loaded,
 		.resourcelist > .loaded:nth-child(odd) {
@@ -98,8 +105,6 @@
 		}
 		.resourcelist .loaded .btn-resource-right {
 			display: inline-block;
-			margin-top: 2px;
-			float: right;
 		}
 
 		#editlayer-select {

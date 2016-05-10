@@ -810,6 +810,10 @@ CEditor = function() {
 	this.saveScene = function(name) {
 		scenes.saveScene(name, serializeScene());
 	}
+
+	this.saveAsNewScene = function() {
+		scenes.saveAsNewScene(serializeScene());
+	}
 };
 
 
@@ -1007,21 +1011,41 @@ var CScene = function(phaserGame) {
 var CSceneManager = function() {
 	var scenesDiv = $('scenes');
 
+	scenesDiv.addScene = function(name) {
+		var item = document.createElement('div');
+		item.id = 'scene-' + name;
+		item.innerHTML = "<button class='add-resource' onclick='editor.loadScene(\"" + name + "\")'>Load</button>"
+						+ name
+						+ "<button class='btn-resource-right' onclick='editor.saveScene(\"" + name + "\")'>Save</button>";
+
+		this.insertBefore(item, this.childNodes[0]);
+	}
+
+	scenesDiv.clearScenes = function() {
+		this.innerHTML =
+			 "<div style='padding: 5px 2px'>"
+			+ "<input type='text' placeholder='New scene' id='new-scene-name'>"
+			+ "<button class='btn-resource-right always' onclick='editor.saveAsNewScene()'>Save</button>"
+			+"</div>";
+	}
+
+	scenesDiv.setLoaded = function(name) {
+		for (var i = 0; i < this.childNodes.length; ++i) {
+			var item = this.childNodes[i];
+			item.className = (item.id == "scene-" + name ? "loaded" : "");
+		}
+	}
+
 	this.loadScenes = function() {
 		var req = new XMLHttpRequest();
 		req.onreadystatechange = function() {
 			if (req.readyState == 4 && req.status == 200) {
 				var scenes = JSON.parse(req.responseText);
-				var s = "";
-				scenes.forEach(function(scene) {
-					s += "<div id='scene-" + scene + "'>"
-						+ "<button class='add-resource' onclick='editor.loadScene(\"" + scene + "\")'>Load</button>"
-						+ scene
-						+ "<button class='btn-resource-right' onclick='editor.saveScene(\"" + scene + "\")'>Save</button>"
-						+"</div>";
-				});
 
-				scenesDiv.innerHTML = s;
+				scenesDiv.clearScenes();
+				scenes.forEach(function(scene) {
+					scenesDiv.addScene(scene);
+				});
 			}
 		}
 		req.open("GET", "scenes.php", true);
@@ -1036,11 +1060,7 @@ var CSceneManager = function() {
 		req.onreadystatechange = function() {
 			if (req.readyState == 4 && req.status == 200) {
 				callback.call(callbackScope, req.responseText);
-
-				for (var i = 0; i < scenesDiv.childNodes.length; ++i) {
-					var item = scenesDiv.childNodes[i];
-					item.className = (item.id == "scene-" + name ? "loaded" : "");
-				}
+				scenesDiv.setLoaded(name);
 			}
 		}
 		req.open("GET", "scenes.php?name=" + name, true);
@@ -1048,16 +1068,41 @@ var CSceneManager = function() {
 		req.send();
 	}
 
-	this.saveScene = function(name, data) {
+	this.saveScene = function(name, data, callback, callbackContext) {
 		var req = new XMLHttpRequest();
 		req.onreadystatechange = function() {
-			if (req.readyState == 4 && req.status == 200)
+			if (req.readyState == 4 && req.status == 200) {
 				editor.log("Saved scene '" + name + ".json' successfully!");
+
+				if (typeof callback !== 'undefined')
+					callback.call(callbackContext);
+			}
 		}
 		req.open("POST", "scenes.php", true);
 		req.setRequestHeader("Content-type", "application/x-www-form-urlencoded")
 		req.onerror = function() {}
 		req.send("save=" + name + "&json=" + data);
+	}
+
+	// scene name is retrieved from the #new-scene-name input textfield
+	this.saveAsNewScene = function(data) {
+		var name = $('new-scene-name').value;
+		if (name.length == 0) {
+			alert("Please type in a scene name!");
+			return false;
+		}
+
+		for (var i = 0; i < scenesDiv.childNodes.length; ++i) {
+			if (scenesDiv.childNodes[i].innerHTML.indexOf(name) != -1) {
+				alert("Scene already exists!");
+				return false;
+			}
+		}
+
+		this.saveScene(name, data, function() {
+			scenesDiv.addScene(name);
+			scenesDiv.setLoaded(name);
+		});
 	}
 }
 
