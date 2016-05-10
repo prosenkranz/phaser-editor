@@ -179,7 +179,7 @@ CEditor = function() {
 		game.input.keyboard.addKey(Phaser.Keyboard.ONE).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_TRANSFORM); }, $this);
 		game.input.keyboard.addKey(Phaser.Keyboard.TWO).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_CREATE); }, $this);
 		game.input.keyboard.addKey(Phaser.Keyboard.THREE).onDown.add(function() { if (document.activeElement != document.body) return; this.setMode(MODE_EDIT); }, $this);
-		game.input.keyboard.addKey(Phaser.Keyboard.DELETE).onDown.add(function() { if (document.activeElement != document.body) return; deleteSelectedPoly(); }, $this);
+		game.input.keyboard.addKey(Phaser.Keyboard.DELETE).onDown.add(function() { if (document.activeElement != document.body) return; onDeleteButton(); }, $this);
 		game.input.keyboard.addKey(Phaser.Keyboard.ESC).onDown.add(function() { if (document.activeElement != document.body) return; cancelCreatePoly(); }, $this);
 		
 		game.input.keyboard.removeKeyCapture(Phaser.Keyboard.ONE);
@@ -405,6 +405,22 @@ CEditor = function() {
 		scaling = false;
 	}
 	
+
+	// -------------------------------------------------------------------------
+	// 		K e y b o a r d   E v e n t s
+	// -------------------------------------------------------------------------
+	function onDeleteButton() {
+		if (mode == MODE_TRANSFORM) {
+			if (selectedPoly != null) {
+				deleteSelectedPoly();
+			}
+			else if (selectedObject != null) {
+				scene.deleteObject(selectedObject.getName());
+				selectedObject = null;
+			}
+		}
+	}
+
 	// -------------------------------------------------------------------------
 	// 		R e n d e r
 	// -------------------------------------------------------------------------	
@@ -910,7 +926,7 @@ var CScene = function(phaserGame) {
 
 	this.deleteObject = function(name) {
 		for (var i = 0; i < this.objects.length; ++i) {
-			if (this.objects[i].name == name) {
+			if (this.objects[i].getName() == name) {
 				this.objects[i].destroy();
 				this.objects.splice(i, 1);
 				break;
