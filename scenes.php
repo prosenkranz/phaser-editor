@@ -63,7 +63,7 @@ function save_scene($name, $jsonData)
 	if (!file_exists($dir . $name . '.js'))
 	{
 		$js = "var " . $name . " = function(phaserGame) {\n"
-			. "\tCScene.call(this);\n"
+			. "\tCScene.call(this, phaserGame);\n"
 			. "\n"
 			. "\tthis.onLoad = function() {\n"
 			. "\t}\n"
