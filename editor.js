@@ -896,7 +896,8 @@ var CScene = function(phaserGame) {
 	// Deletes all objects and polys
 	this.clear = function() {
 		this.objects.forEach(function(obj) {
-			obj.sprite.destroy();
+			if (obj.sprite != null)
+				obj.sprite.destroy();
 		});
 
 		this.objects = [];
@@ -946,6 +947,9 @@ var CScene = function(phaserGame) {
 	this.serializeObjects = function() {
 		var d = [];
 		this.objects.forEach(function(obj) {
+			if (obj.sprite == null)
+				return; // not properly loaded
+
 			d[d.length] = {
 				name: obj.sprite.name,
 				position: { x: Math.round(obj.sprite.body.x), y: Math.round(obj.sprite.body.y) },
