@@ -32,6 +32,9 @@
 			display: inline-block;
 			vertical-align: top;
 		}
+		#properties > div {
+			margin-top: 5px;
+		}
 		#tools {
 			padding: 5px 0px;
 			text-align: left;
@@ -144,7 +147,8 @@
 			<div id="properties-wrapper">
 				Properties:<br />
 				<div id="properties">
-					<label for="prop-name">Name: </label><input type="text" id="prop-name" name="prop-name" placeholder="Object" />
+					<div><label for="prop-name">Name: </label><input type="text" id="prop-name" name="prop-name" placeholder="Object" /></div>
+					<div><label for="prop-label">Label: </label><input type="text" id="prop-label" name="prop-label" placeholder="An object" /></div>
 				</div>
 			</div>
 		</div>

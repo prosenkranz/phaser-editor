@@ -633,6 +633,7 @@ CEditor = function() {
 		selectPoly(null);
 		if (obj != null) {
 			propFields.props.name.value = obj.getName();
+			propFields.props.label.value = obj.getLabel();
 			propFields.show(true);
 		}
 		else {
@@ -657,6 +658,11 @@ CEditor = function() {
 			selectedObject.setName(newval);
 		else if (selectedPoly != null)
 			selectedPoly.name = newval;
+	}
+
+	this.onPropertyLabelChange = function(newval) {
+		if (selectedObject != null)
+			selectedObject.setLabel(newval);
 	}
 
 
@@ -842,6 +848,7 @@ var CObject = function(name, assetName, position, size, angle) {
 	};
 
 	this.sprite = null;
+	this.label = "";
 
 	// Create the phaser object
 	this.create = function(phaserGame) {
@@ -874,6 +881,14 @@ var CObject = function(name, assetName, position, size, angle) {
 	this.setName = function(name) {
 		if (this.sprite != null)
 			this.sprite.name = name;
+	}
+
+	this.getLabel = function() {
+		return this.label;
+	}
+
+	this.setLabel = function(l) {
+		this.label = l;
 	}
 }
 
@@ -952,6 +967,7 @@ var CScene = function(phaserGame) {
 
 			d[d.length] = {
 				name: obj.sprite.name,
+				label: obj.label,
 				position: { x: Math.round(obj.sprite.body.x), y: Math.round(obj.sprite.body.y) },
 				size: { w: Math.round(obj.sprite.width), h: Math.round(obj.sprite.height) },
 				angle: obj.sprite.body.angle,
@@ -972,6 +988,7 @@ var CScene = function(phaserGame) {
 			var position = { x: o.position.x * loadScale.x, y: o.position.y * loadScale.y };
 			var size = { w: o.size.w * loadScale.x, h: o.size.h * loadScale.y };
 			var object = this.objects[this.objects.length] = new CObject(o.name, o.asset, position, size, o.angle);
+			object.setLabel(o.label || "");
 			if (assetMgr.isAssetLoaded(o.asset)) {
 				object.create(game);
 			}
@@ -1286,11 +1303,16 @@ var CAssetManager = function(phaserGame) {
 var CPropertyFields = function() {
 	var container = $('properties');
 	this.props = {
-		name: $('prop-name')
+		name: $('prop-name'),
+		label: $('prop-label')
 	};
 
 	this.props.name.onkeyup = function() {
 		editor.onPropertyNameChange(this.value);
+	}
+
+	this.props.label.onkeyup = function() {
+		editor.onPropertyLabelChange(this.value);
 	}
 
 	this.show = function(show) {
