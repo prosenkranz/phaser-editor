@@ -119,8 +119,7 @@ CEditor = function() {
 	this.config = new CEditorConfig();
 	this.config.onConfigLoaded = function() {
 		scenes.loadScenes();
-		editor.assets.loadAssetsList();
-		loadBackgrounds();
+		editor.loadAssets();
 	}
 
 	var scenes = new CSceneManager();
@@ -606,9 +605,22 @@ CEditor = function() {
 
 	this.assets = new CAssetManager(game);
 
+	this.loadAssets = function() {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function() {
+			if (req.readyState == 4 && req.status == 200) {
+				var d = JSON.parse(req.responseText);
+				$this.assets.setAssetsList(d.assets);
+				$this.setBackgroundsList(d.backgrounds);
+			}
+		}
+		req.open("GET", "datamgr.php?list-assets", true);
+		req.send();
+	}
+
 	this.insertAsset = function(name) {
 		this.assets.loadAsset(name, function(assetName) {
-			var o = scene.addObject(name, assetName);
+			var o = scene.addObject(assetName);
 			this.selectObject(o);
 			this.setMode(MODE_TRANSFORM);
 		}, this);
@@ -656,33 +668,25 @@ CEditor = function() {
 	var backgroundsDiv = $('backgrounds');
 	var loadedBackgrounds = [];
 
-	window.loadBackgrounds = function() {
-		var req = new XMLHttpRequest();
-		req.onreadystatechange = function() {
-			if (req.readyState == 4 && req.status == 200) {
-				var d = JSON.parse(req.responseText);
-				var s = "";
-				loadedBackgrounds = d;
-				d.forEach(function(bg) {
-					s += "<div><button class='add-resource' onclick='setBackground(\"" + bg.name + "\",\"" + bg.file + "\")'>Use</button>" + bg.name + "</div>";
-				});
-				backgroundsDiv.innerHTML = s;
-			}
-		}
-		req.open("GET", editor.config.assetsDir + "backgrounds.json", true);
-		req.send();
+	this.setBackgroundsList = function(backgrounds) {
+		var s = "";
+		loadedBackgrounds = backgrounds;
+		backgrounds.forEach(function(bg) {
+			s += "<div><button class='add-resource' onclick='setBackground(\"" + bg + "\")'>Use</button>" + bg + "</div>";
+		});
+		backgroundsDiv.innerHTML = s;
 	}
 
-	window.setBackground = function(name, file) {
-		if (!game.cache.checkImageKey(name)) {
-			game.load.image(name, editor.config.assetsDir + file);
+	window.setBackground = function(bg) {
+		if (!game.cache.checkImageKey(bg)) {
+			game.load.image(bg, editor.config.assetsDir + bg);
 			game.load.onFileComplete.addOnce(function(progress, key) {
 					scene.setBackground(key);
 				}, $this, 0);
 			game.load.start();
 		}
 		else {
-			scene.setBackground(name);
+			scene.setBackground(bg);
 		}
 	}
 
@@ -756,8 +760,8 @@ CEditor = function() {
 		if (!game.cache.checkImageKey(bgName)) {
 			for (var i = 0; i < loadedBackgrounds.length; ++i) {
 				var loadedBackground = loadedBackgrounds[i];
-				if (loadedBackground.name == bgName) {
-					game.load.image(loadedBackground.name, editor.config.assetsDir + loadedBackground.file);
+				if (loadedBackground == bgName) {
+					game.load.image(loadedBackground, editor.config.assetsDir + loadedBackground);
 					game.load.onFileComplete.addOnce(function(p, key) {
 						scene.setBackground(key);
 					}, $this, 0);
@@ -922,8 +926,8 @@ var CScene = function(phaserGame) {
 
 	// Adds the object to the scene with given name and the assetName of a LOADED asset.
 	// Returns reference to the new object.
-	this.addObject = function(name, assetName) {
-		var o = this.objects[this.objects.length] = new CObject(name, assetName, { x: game.width * 0.5, y: game.height * 0.5 });
+	this.addObject = function(assetName) {
+		var o = this.objects[this.objects.length] = new CObject(assetName, assetName, { x: game.width * 0.5, y: game.height * 0.5 });
 		o.create(game);
 		return o;
 	}
@@ -1048,7 +1052,7 @@ var CSceneManager = function() {
 				});
 			}
 		}
-		req.open("GET", "scenes.php", true);
+		req.open("GET", "datamgr.php?list-scenes", true);
 		req.onerror = function() {}
 		req.send();
 	}
@@ -1063,7 +1067,7 @@ var CSceneManager = function() {
 				scenesDiv.setLoaded(name);
 			}
 		}
-		req.open("GET", "scenes.php?name=" + name, true);
+		req.open("GET", "datamgr.php?load-scene&name=" + name, true);
 		req.onerror = function() {}
 		req.send();
 	}
@@ -1078,10 +1082,10 @@ var CSceneManager = function() {
 					callback.call(callbackContext);
 			}
 		}
-		req.open("POST", "scenes.php", true);
+		req.open("POST", "datamgr.php?save-scene&name=" + name, true);
 		req.setRequestHeader("Content-type", "application/x-www-form-urlencoded")
 		req.onerror = function() {}
-		req.send("save=" + name + "&json=" + data);
+		req.send("json=" + data);
 	}
 
 	// scene name is retrieved from the #new-scene-name input textfield
@@ -1168,36 +1172,18 @@ var CAssetManager = function(phaserGame) {
 	var loadQueue = [];
 	var loadQueueCompleteCB = function() {}
 
-	// Load assets.json from server - does not yet load the resources themselfs
-	this.loadAssetsList = function() {
-		var req = new XMLHttpRequest();
-		req.onreadystatechange = function() {
-			if (req.readyState == 4 && req.status == 200) {
-				var d = JSON.parse(req.responseText);
-				var s = "";
-				assets = d;
-				d.forEach(function(asset) {
-					s += "<div><button class='add-resource' onclick='editor.insertAsset(\"" + asset.name + "\")'>Add</button>" + asset.name + "</div>";
-				});
-				assetsDiv.innerHTML = s;
-			}
-		}
-		req.open("GET", editor.config.assetsDir + "assets.json", true);
-		req.send();
-	}
-
-	this.getAsset = function(name) {
-		for (var i = 0; i < assets.length; ++i) {
-			if (assets[i].name == name)
-				return assets[i];
-		}
-
-		return null;
+	this.setAssetsList = function(list) {
+		assets = list;
+		var s = "";
+		list.forEach(function(asset) {
+			s += "<div><button class='add-resource' onclick='editor.insertAsset(\"" + asset + "\")'>Add</button>" + asset + "</div>";
+		});
+		assetsDiv.innerHTML = s;
 	}
 
 	this.isAssetKnown = function(name) {
 		for (var i = 0; i < assets.length; ++i) {
-			if (assets[i].name == name)
+			if (assets[i] == name)
 				return true;
 		}
 
@@ -1217,13 +1203,12 @@ var CAssetManager = function(phaserGame) {
 			return true;
 		}
 
-		var asset = this.getAsset(name);
-		if (asset == null) {
+		if (!this.isAssetKnown(name)) {
 			editor.log("Cannot load asset: '" + name + "' not known");
 			return false; // not known
 		}
 
-		game.load.image(asset.name, editor.config.assetsDir + asset.file);
+		game.load.image(name, editor.config.assetsDir + name);
 		game.load.onFileComplete.addOnce(function(p, key) {
 			onload.call(scope, key);
 		});
@@ -1237,17 +1222,16 @@ var CAssetManager = function(phaserGame) {
 			return true;
 
 		for (var i = 0; i < loadQueue.length; ++i) {
-			if (loadQueue[i].name == name)
+			if (loadQueue[i] == name)
 				return true; // already queued
 		}
 
-		var asset = this.getAsset(name);
-		if (asset == null) {
+		if (!this.isAssetKnown(name)) {
 			editor.log("Cannot queue asset for load: '" + name + "' not known!");
 			return false;
 		}
 
-		loadQueue[loadQueue.length] = asset;
+		loadQueue[loadQueue.length] = name;
 	}
 
 	this.isLoadQueueFilled = function() {
@@ -1264,12 +1248,12 @@ var CAssetManager = function(phaserGame) {
 		}
 
 		loadQueue.forEach(function(asset) {
-			game.load.image(asset.name, editor.config.assetsDir + asset.file);
+			game.load.image(asset, editor.config.assetsDir + asset);
 		});
 
 		loadQueueCompleteCB = function(p, key) {
 			for (var i = 0; i < loadQueue.length; ++i) {
-				if (key == loadQueue[i].name) {
+				if (key == loadQueue[i]) {
 					loadQueue.splice(i, 1);
 					break;
 				}
