@@ -576,6 +576,7 @@ CEditor = function() {
 
 		if (selectedPoly != null) {
 			propFields.props.name.value = selectedPoly.name;
+			propFields.props.label.value = selectedPoly.label;
 			propFields.show(true);
 		}
 		else {
@@ -663,6 +664,8 @@ CEditor = function() {
 	this.onPropertyLabelChange = function(newval) {
 		if (selectedObject != null)
 			selectedObject.setLabel(newval);
+		else if (selectedPoly != null)
+			selectedPoly.label = newval;
 	}
 
 
@@ -735,6 +738,7 @@ CEditor = function() {
 		scene.polys.forEach(function(poly) {
 			var p = d.polygons[d.polygons.length] = {
 				name: poly.name,
+				label: poly.label,
 				points: []
 			};
 			for (var i = 0; i < poly.points.length; ++i) {
@@ -797,7 +801,7 @@ CEditor = function() {
 				}
 			}
 
-			scene.addPoly(poly.name, points);
+			scene.addPoly(poly.name, points, poly.label);
 		});
 
 		// Import objects:
@@ -1011,12 +1015,13 @@ var CScene = function(phaserGame) {
 
 
 
-	this.addPoly = function(name, points) {
+	this.addPoly = function(name, points, label) {
 		 this.polys[this.polys.length] = {
 			points: points,
 			aabb: calculateAABB(points),
 			selected: false,
-			name: name
+			name: name,
+			label: label || ""
 		};
 	}
 
